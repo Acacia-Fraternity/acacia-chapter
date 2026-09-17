@@ -65,7 +65,7 @@ export default function NewEventPage() {
 
         <button
           type="submit"
-          className="rounded-md bg-neutral-900 text-white px-4 py-2 text-sm font-medium"
+          className="rounded-md bg-acacia-gold text-acacia-black px-4 py-2 text-sm font-semibold"
         >
           Create event
         </button>

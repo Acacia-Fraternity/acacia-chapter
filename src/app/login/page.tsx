@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { AcaciaMark } from "@/components/acacia-mark";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -48,8 +49,11 @@ export default function LoginPage() {
   return (
     <main className="flex flex-1 items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-semibold">Acacia</h1>
+        <div className="text-center space-y-2">
+          <div className="flex justify-center">
+            <AcaciaMark size={56} />
+          </div>
+          <h1 className="text-2xl font-bold">Acacia</h1>
           <p className="text-sm text-neutral-500">
             {mode === "sign-in" ? "Sign in to your account" : "Create an account"}
           </p>
@@ -97,7 +101,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-md bg-neutral-900 text-white py-2 text-sm font-medium disabled:opacity-50"
+            className="w-full rounded-md bg-acacia-gold text-acacia-black py-2 text-sm font-semibold disabled:opacity-50"
           >
             {loading ? "Please wait…" : mode === "sign-in" ? "Sign in" : "Sign up"}
           </button>

@@ -11,10 +11,47 @@ create table if not exists profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   full_name text not null default '',
   role text not null default 'member' check (role in ('member', 'admin')),
+  -- Independent of `role`: separate ON/OFF switches an admin can flip per
+  -- member from the admin dashboard, e.g. to mute someone in chat without
+  -- touching their membership status at all.
+  can_chat boolean not null default true,
+  can_react boolean not null default true,
   created_at timestamptz not null default now()
 );
 
 alter table profiles enable row level security;
+
+-- Defined before any policy/trigger below that references it — CREATE POLICY
+-- resolves function calls in USING/WITH CHECK immediately, unlike a plpgsql
+-- function body, so is_admin() must already exist at that point.
+create or replace function is_admin()
+returns boolean
+language sql
+security definer set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from profiles where id = auth.uid() and role = 'admin'
+  );
+$$;
+
+create or replace function can_chat()
+returns boolean
+language sql
+security definer set search_path = public
+stable
+as $$
+  select coalesce((select can_chat from profiles where id = auth.uid()), false);
+$$;
+
+create or replace function can_react()
+returns boolean
+language sql
+security definer set search_path = public
+stable
+as $$
+  select coalesce((select can_react from profiles where id = auth.uid()), false);
+$$;
 
 drop policy if exists "profiles are viewable by any signed-in member" on profiles;
 create policy "profiles are viewable by any signed-in member"
@@ -23,11 +60,42 @@ create policy "profiles are viewable by any signed-in member"
   using (true);
 
 drop policy if exists "users can update their own profile name" on profiles;
-create policy "users can update their own profile name"
+drop policy if exists "users can update their own profile, admins can update anyone" on profiles;
+create policy "users can update their own profile, admins can update anyone"
   on profiles for update
   to authenticated
-  using (auth.uid() = id)
-  with check (auth.uid() = id);
+  using (auth.uid() = id or is_admin())
+  with check (auth.uid() = id or is_admin());
+
+-- IMPORTANT: Postgres RLS controls which ROWS a policy allows, not which
+-- COLUMNS — the "update their own profile" half of the policy above would,
+-- on its own, let any signed-in member run
+-- `update profiles set role = 'admin' where id = auth.uid()` themselves.
+-- This trigger is what actually stops that: it blocks any change to
+-- role/can_chat/can_react unless the person making the change is already
+-- an admin. This is the real enforcement; the admin dashboard UI is just
+-- a convenience on top of it.
+create or replace function prevent_self_privilege_escalation()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if not is_admin() and (
+    new.role is distinct from old.role
+    or new.can_chat is distinct from old.can_chat
+    or new.can_react is distinct from old.can_react
+  ) then
+    raise exception 'Only an admin can change role, can_chat, or can_react';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_profile_permission_change on profiles;
+create trigger on_profile_permission_change
+  before update on profiles
+  for each row execute procedure prevent_self_privilege_escalation();
 
 -- New signups get a profile row automatically (default role: member).
 create or replace function handle_new_user()
@@ -46,18 +114,6 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure handle_new_user();
-
--- Small helper used by policies below.
-create or replace function is_admin()
-returns boolean
-language sql
-security definer set search_path = public
-stable
-as $$
-  select exists (
-    select 1 from profiles where id = auth.uid() and role = 'admin'
-  );
-$$;
 
 -- ============================================================
 -- events — a meeting/philanthropy/chapter event with a location
@@ -194,6 +250,128 @@ end;
 $$;
 
 grant execute on function check_in(uuid, double precision, double precision) to authenticated;
+
+-- ============================================================
+-- messages — one shared chapter-wide chat. Reading is open to every
+-- signed-in brother; POSTING is gated by profiles.can_chat. Like checkins,
+-- there is deliberately no direct INSERT policy — send_message() is the
+-- only path in, so the permission check can't be bypassed by calling the
+-- table directly from the browser console.
+-- ============================================================
+create table if not exists messages (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references profiles (id) on delete cascade,
+  content text not null check (char_length(trim(content)) between 1 and 2000),
+  created_at timestamptz not null default now()
+);
+
+alter table messages enable row level security;
+
+drop policy if exists "messages are viewable by any signed-in member" on messages;
+create policy "messages are viewable by any signed-in member"
+  on messages for select
+  to authenticated
+  using (true);
+
+drop policy if exists "members can delete their own messages, admins any" on messages;
+create policy "members can delete their own messages, admins any"
+  on messages for delete
+  to authenticated
+  using (auth.uid() = user_id or is_admin());
+
+create or replace function send_message(p_content text)
+returns messages
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_row messages;
+begin
+  if not can_chat() then
+    raise exception 'You do not have permission to send messages';
+  end if;
+
+  insert into messages (user_id, content)
+  values (auth.uid(), trim(p_content))
+  returning * into v_row;
+
+  return v_row;
+end;
+$$;
+
+grant execute on function send_message(text) to authenticated;
+
+-- ============================================================
+-- message_reactions — emoji reactions on a message. Same pattern as
+-- messages: no direct INSERT/DELETE policy, toggle_reaction() is the only
+-- way in and it enforces profiles.can_react before writing anything.
+-- ============================================================
+create table if not exists message_reactions (
+  id uuid primary key default gen_random_uuid(),
+  message_id uuid not null references messages (id) on delete cascade,
+  user_id uuid not null references profiles (id) on delete cascade,
+  emoji text not null check (char_length(emoji) between 1 and 8),
+  created_at timestamptz not null default now(),
+  unique (message_id, user_id, emoji)
+);
+
+alter table message_reactions enable row level security;
+
+drop policy if exists "reactions are viewable by any signed-in member" on message_reactions;
+create policy "reactions are viewable by any signed-in member"
+  on message_reactions for select
+  to authenticated
+  using (true);
+
+-- Toggles: adds the reaction if it's not there yet, removes it if it is.
+-- Returns true if a reaction now exists, false if one was just removed.
+create or replace function toggle_reaction(p_message_id uuid, p_emoji text)
+returns boolean
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_existing uuid;
+begin
+  if not can_react() then
+    raise exception 'You do not have permission to react to messages';
+  end if;
+
+  select id into v_existing
+  from message_reactions
+  where message_id = p_message_id and user_id = auth.uid() and emoji = p_emoji;
+
+  if v_existing is not null then
+    delete from message_reactions where id = v_existing;
+    return false;
+  end if;
+
+  insert into message_reactions (message_id, user_id, emoji)
+  values (p_message_id, auth.uid(), p_emoji);
+  return true;
+end;
+$$;
+
+grant execute on function toggle_reaction(uuid, text) to authenticated;
+
+-- Realtime: lets the chat UI subscribe to new messages/reactions over a
+-- websocket instead of polling. Safe to re-run (no-ops if already added).
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and tablename = 'messages'
+  ) then
+    alter publication supabase_realtime add table messages;
+  end if;
+
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and tablename = 'message_reactions'
+  ) then
+    alter publication supabase_realtime add table message_reactions;
+  end if;
+end $$;
 
 -- ============================================================
 -- Bootstrap the first admin. Run this SEPARATELY, once, after you've

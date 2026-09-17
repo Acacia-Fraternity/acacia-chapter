@@ -57,7 +57,7 @@ export function CheckInButton({ eventId }: { eventId: string }) {
       <button
         onClick={handleCheckIn}
         disabled={status === "locating" || status === "submitting"}
-        className="rounded-md bg-neutral-900 text-white px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+        className="rounded-md bg-acacia-gold text-acacia-black px-3 py-1.5 text-sm font-semibold disabled:opacity-50"
       >
         {status === "locating"
           ? "Finding you…"

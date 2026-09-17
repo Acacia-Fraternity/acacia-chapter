@@ -2,6 +2,8 @@ export interface Profile {
   id: string;
   full_name: string;
   role: "member" | "admin";
+  can_chat: boolean;
+  can_react: boolean;
   created_at: string;
 }
 

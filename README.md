@@ -1,11 +1,19 @@
 # Acacia
 
-Chapter attendance and involvement tracker. Brothers sign in, see open events,
-and check in — check-in only succeeds if their phone's GPS says they're
-actually near the event location. Officers create events and see who showed up.
+Chapter attendance, involvement, and chat tracker, themed on Acacia
+Fraternity's real brand (see [BRAND.md](BRAND.md) for the full research —
+colors, fonts, logo usage, sourced from their official brand guide).
 
-Built with Next.js (hosted on Vercel) and Supabase (database + login). Both
-have free tiers that comfortably cover a single chapter's usage.
+- Brothers sign in, see open events, and check in — check-in only succeeds
+  if their phone's GPS says they're actually near the event location.
+- A shared chapter chat, with sending and reacting each independently
+  gated by a per-member permission an admin controls.
+- Officers create events, see who showed up, and manage every member's
+  role/chat/react permissions from an admin dashboard.
+
+Built with Next.js (hosted on Vercel) and Supabase (database + login +
+realtime). Both have free tiers that comfortably cover a single chapter's
+usage.
 
 ## Why it's built this way (read this before touching ownership/access)
 
@@ -92,6 +100,27 @@ to fake by editing values in the browser dev console. Instead:
 - This means even a technically savvy brother can't spoof a check-in
   without actually spoofing their phone's GPS at the OS level — a
   meaningfully higher bar than anything client-side code could enforce.
+
+## How chat permissions actually work
+
+Same philosophy as check-in: permission checks live in the database, not
+just the UI hiding buttons.
+
+- `profiles.can_chat` / `profiles.can_react` are the actual gates. The
+  `messages` and `message_reactions` tables have **no direct INSERT policy**
+  for regular users — the only way to write to them is the `send_message()`
+  and `toggle_reaction()` Postgres functions, which check the caller's
+  permission before writing anything.
+- Only an admin can change someone's `role`, `can_chat`, or `can_react`.
+  This is enforced by the `prevent_self_privilege_escalation` trigger in
+  `supabase/schema.sql` — without it, Postgres Row Level Security alone
+  would let a member run an UPDATE on their *own* profile row and grant
+  themselves admin, since RLS restricts which *rows* a policy allows, not
+  which *columns*. The admin dashboard's toggles are just a convenience
+  layer on top of this — the real enforcement doesn't care whether the
+  request came from that UI or someone poking the API directly.
+- Chat is realtime (Supabase's Postgres change feed over a websocket, see
+  `src/components/chat-room.tsx`) rather than polling.
 
 ## Local development
 

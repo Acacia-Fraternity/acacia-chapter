@@ -14,7 +14,7 @@ export function SignOutButton() {
         router.push("/login");
         router.refresh();
       }}
-      className="text-sm text-neutral-500 hover:text-neutral-800"
+      className="text-sm text-neutral-300 hover:text-acacia-gold"
     >
       Sign out
     </button>

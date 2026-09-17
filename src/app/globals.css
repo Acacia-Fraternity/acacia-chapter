@@ -2,25 +2,29 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #1e1e1e;
+
+  /* Acacia Fraternity brand palette — sourced from the 2019 Acacia Brand
+     Guide (primary colors, used most frequently: black + gold; secondary
+     colors, used less frequently: green + blue). Do not tweak these hex
+     values without checking the guide — they're exact PMS conversions. */
+  --acacia-black: #1e1e1e;
+  --acacia-gold: #f9e547;
+  --acacia-green: #008675;
+  --acacia-blue: #003d4c;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-acacia-black: var(--acacia-black);
+  --color-acacia-gold: var(--acacia-gold);
+  --color-acacia-green: var(--acacia-green);
+  --color-acacia-blue: var(--acacia-blue);
+  --font-sans: var(--font-archivo);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }

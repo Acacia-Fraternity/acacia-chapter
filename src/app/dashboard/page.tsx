@@ -61,7 +61,7 @@ export default async function DashboardPage() {
                 <span
                   className={`mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
                     status === "open"
-                      ? "bg-green-100 text-green-700"
+                      ? "bg-acacia-green/15 text-acacia-green"
                       : status === "upcoming"
                         ? "bg-neutral-100 text-neutral-600"
                         : "bg-neutral-100 text-neutral-400"
@@ -73,7 +73,7 @@ export default async function DashboardPage() {
 
               <div className="shrink-0">
                 {alreadyCheckedIn ? (
-                  <span className="text-sm text-green-700 font-medium">
+                  <span className="text-sm text-acacia-green font-medium">
                     ✓ Checked in
                   </span>
                 ) : status === "open" ? (

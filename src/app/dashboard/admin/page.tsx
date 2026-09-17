@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { MemberPermissionsRow } from "@/components/member-permissions-row";
 import type { Event, Profile } from "@/lib/types";
 
 export default async function AdminPage() {
@@ -35,7 +36,7 @@ export default async function AdminPage() {
         <h1 className="text-lg font-semibold">Admin</h1>
         <Link
           href="/dashboard/admin/new"
-          className="rounded-md bg-neutral-900 text-white px-3 py-1.5 text-sm font-medium"
+          className="rounded-md bg-acacia-black text-white px-3 py-1.5 text-sm font-semibold"
         >
           New event
         </Link>
@@ -65,30 +66,21 @@ export default async function AdminPage() {
 
       <section className="space-y-3">
         <h2 className="text-sm font-medium text-neutral-500">
-          Members ({members?.length ?? 0})
+          Members &amp; permissions ({members?.length ?? 0})
         </h2>
         <p className="text-xs text-neutral-400">
-          To promote or demote an admin, use the Supabase dashboard&apos;s Table
-          Editor on the <code>profiles</code> table — this is intentionally not
-          a button in the UI, so a compromised session can&apos;t mint new admins.
+          Chat/React control whether that person can post messages or add
+          reactions. Changing these (and admin status) is enforced by the
+          database itself, not just this screen — see{" "}
+          <code>supabase/schema.sql</code>.
         </p>
-        <ul className="space-y-1">
+        <ul className="space-y-1.5">
           {members?.map((member) => (
-            <li
+            <MemberPermissionsRow
               key={member.id}
-              className="flex items-center justify-between rounded-md px-3 py-1.5 text-sm border border-neutral-100"
-            >
-              <span>{member.full_name || "(no name set)"}</span>
-              <span
-                className={
-                  member.role === "admin"
-                    ? "text-xs font-medium text-neutral-900"
-                    : "text-xs text-neutral-400"
-                }
-              >
-                {member.role}
-              </span>
-            </li>
+              member={member}
+              isSelf={member.id === user!.id}
+            />
           ))}
         </ul>
       </section>
