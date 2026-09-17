@@ -22,10 +22,18 @@ export default async function DashboardPage() {
     .returns<Checkin[]>();
 
   const checkedInEventIds = new Set((myCheckins ?? []).map((c) => c.event_id));
+  const totalHours = (myCheckins ?? []).reduce((sum, c) => sum + Number(c.hours_earned), 0);
 
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-semibold">Events</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold">Events</h1>
+        {totalHours > 0 && (
+          <span className="text-sm text-acacia-green font-medium">
+            {totalHours} hour{totalHours === 1 ? "" : "s"} earned
+          </span>
+        )}
+      </div>
 
       {(!events || events.length === 0) && (
         <p className="text-sm text-muted">No events yet.</p>
@@ -50,17 +58,27 @@ export default async function DashboardPage() {
                   {new Date(event.starts_at).toLocaleString()} –{" "}
                   {new Date(event.ends_at).toLocaleString()}
                 </p>
-                <span
-                  className={`mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-                    status === "open"
-                      ? "bg-acacia-green/15 text-acacia-green"
-                      : status === "upcoming"
-                        ? "bg-surface-border text-muted"
-                        : "bg-surface-border text-muted-foreground"
-                  }`}
-                >
-                  {status}
-                </span>
+                {event.address && (
+                  <p className="text-xs text-muted-foreground">{event.address}</p>
+                )}
+                <div className="mt-2 flex items-center gap-1.5">
+                  <span
+                    className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+                      status === "open"
+                        ? "bg-acacia-green/15 text-acacia-green"
+                        : status === "upcoming"
+                          ? "bg-surface-border text-muted"
+                          : "bg-surface-border text-muted-foreground"
+                    }`}
+                  >
+                    {status}
+                  </span>
+                  {event.hours > 0 && (
+                    <span className="inline-block rounded-full bg-acacia-gold text-acacia-black px-2 py-0.5 text-xs font-medium">
+                      {event.hours} hr{event.hours === 1 ? "" : "s"}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="shrink-0">

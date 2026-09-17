@@ -28,18 +28,37 @@ export default function NewEventPage() {
 
         <LocationPicker />
 
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Check-in radius (meters)
-          </label>
-          <input
-            name="radius_meters"
-            type="number"
-            defaultValue={100}
-            min={5}
-            required
-            className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
-          />
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Check-in radius (meters)
+            </label>
+            <input
+              name="radius_meters"
+              type="number"
+              defaultValue={100}
+              min={5}
+              required
+              className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Hours awarded
+            </label>
+            <input
+              name="hours"
+              type="number"
+              step="0.5"
+              min={0}
+              defaultValue={0}
+              className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              For philanthropy/service events — checking in credits this many
+              hours. Leave 0 for a normal meeting/social.
+            </p>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2">

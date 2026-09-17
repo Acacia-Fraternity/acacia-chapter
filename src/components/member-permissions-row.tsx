@@ -11,9 +11,11 @@ import type { Profile } from "@/lib/types";
 export function MemberPermissionsRow({
   member,
   isSelf,
+  hours,
 }: {
   member: Profile;
   isSelf: boolean;
+  hours: number;
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +37,9 @@ export function MemberPermissionsRow({
         <span className="text-sm">
           {member.full_name || "(no name set)"}
           {isSelf && <span className="text-muted-foreground"> (you)</span>}
+          {hours > 0 && (
+            <span className="ml-2 text-xs text-acacia-green">{hours} hrs</span>
+          )}
         </span>
 
         <div className="flex items-center gap-4 text-xs">

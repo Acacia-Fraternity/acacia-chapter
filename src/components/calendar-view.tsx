@@ -175,6 +175,14 @@ export function CalendarView({
                       minute: "2-digit",
                     })}
                   </p>
+                  {event.address && (
+                    <p className="text-xs text-muted-foreground">{event.address}</p>
+                  )}
+                  {event.hours > 0 && (
+                    <span className="mt-1 inline-block rounded-full bg-acacia-gold text-acacia-black px-2 py-0.5 text-xs font-medium">
+                      {event.hours} hr{event.hours === 1 ? "" : "s"}
+                    </span>
+                  )}
                 </div>
                 <div className="shrink-0">
                   {alreadyCheckedIn ? (

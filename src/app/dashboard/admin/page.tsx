@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MemberPermissionsRow } from "@/components/member-permissions-row";
-import type { Event, Profile } from "@/lib/types";
+import type { Event, Profile, Checkin } from "@/lib/types";
 
 export default async function AdminPage() {
   const supabase = await createClient();
@@ -29,6 +29,19 @@ export default async function AdminPage() {
     .select("*")
     .order("full_name")
     .returns<Profile[]>();
+
+  const { data: allCheckins } = await supabase
+    .from("checkins")
+    .select("*")
+    .returns<Checkin[]>();
+
+  const hoursByUserId = new Map<string, number>();
+  for (const checkin of allCheckins ?? []) {
+    hoursByUserId.set(
+      checkin.user_id,
+      (hoursByUserId.get(checkin.user_id) ?? 0) + Number(checkin.hours_earned),
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -80,6 +93,7 @@ export default async function AdminPage() {
               key={member.id}
               member={member}
               isSelf={member.id === user!.id}
+              hours={hoursByUserId.get(member.id) ?? 0}
             />
           ))}
         </ul>

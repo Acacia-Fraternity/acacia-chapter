@@ -11,9 +11,11 @@ export interface Event {
   id: string;
   name: string;
   description: string;
+  address: string;
   latitude: number;
   longitude: number;
   radius_meters: number;
+  hours: number;
   starts_at: string;
   ends_at: string;
   created_by: string;
@@ -27,6 +29,7 @@ export interface Checkin {
   latitude: number;
   longitude: number;
   distance_meters: number;
+  hours_earned: number;
   checked_in_at: string;
 }
 

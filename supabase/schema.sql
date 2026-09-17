@@ -123,9 +123,18 @@ create table if not exists events (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   description text not null default '',
+  -- Human-readable address, for events created by typing an address
+  -- (geocoded server-side to latitude/longitude) rather than standing at
+  -- the venue and using "current location." Purely informational — the
+  -- lat/lng columns are what check-in actually validates against.
+  address text not null default '',
   latitude double precision not null,
   longitude double precision not null,
   radius_meters integer not null default 100,
+  -- Service/philanthropy hours a check-in earns, e.g. for a philanthropy
+  -- event where attendance counts toward a requirement. 0 for a normal
+  -- meeting/social that doesn't award anything.
+  hours numeric not null default 0,
   starts_at timestamptz not null,
   ends_at timestamptz not null,
   created_by uuid not null references profiles (id),
@@ -173,6 +182,11 @@ create table if not exists checkins (
   latitude double precision not null,
   longitude double precision not null,
   distance_meters double precision not null,
+  -- Snapshotted from events.hours at check-in time (same reasoning as
+  -- distance_meters above) — if an admin edits an event's hours value
+  -- later, past check-ins keep the amount that was actually promised
+  -- when the person showed up, rather than silently changing.
+  hours_earned numeric not null default 0,
   checked_in_at timestamptz not null default now(),
   unique (event_id, user_id)
 );
@@ -236,8 +250,8 @@ begin
       round(v_distance), v_event.radius_meters;
   end if;
 
-  insert into checkins (event_id, user_id, latitude, longitude, distance_meters)
-  values (p_event_id, auth.uid(), p_lat, p_lng, v_distance)
+  insert into checkins (event_id, user_id, latitude, longitude, distance_meters, hours_earned)
+  values (p_event_id, auth.uid(), p_lat, p_lng, v_distance, v_event.hours)
   on conflict (event_id, user_id) do update
     set latitude = excluded.latitude,
         longitude = excluded.longitude,
