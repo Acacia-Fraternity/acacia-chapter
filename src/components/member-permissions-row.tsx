@@ -30,11 +30,11 @@ export function MemberPermissionsRow({
   }
 
   return (
-    <li className="rounded-md border border-neutral-100 px-3 py-2">
+    <li className="rounded-md border border-surface-border px-3 py-2">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <span className="text-sm">
           {member.full_name || "(no name set)"}
-          {isSelf && <span className="text-neutral-400"> (you)</span>}
+          {isSelf && <span className="text-muted-foreground"> (you)</span>}
         </span>
 
         <div className="flex items-center gap-4 text-xs">
@@ -70,7 +70,7 @@ export function MemberPermissionsRow({
                 setMemberRole(member.id, e.target.value as "member" | "admin"),
               )
             }
-            className="rounded border border-neutral-300 px-1.5 py-0.5 text-xs disabled:opacity-50"
+            className="rounded border border-surface-border px-1.5 py-0.5 text-xs disabled:opacity-50"
           >
             <option value="member">member</option>
             <option value="admin">admin</option>

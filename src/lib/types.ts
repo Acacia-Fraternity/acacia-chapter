@@ -29,3 +29,30 @@ export interface Checkin {
   distance_meters: number;
   checked_in_at: string;
 }
+
+export interface ChapterNote {
+  id: string;
+  title: string;
+  content: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChapterFile {
+  id: string;
+  title: string;
+  storage_path: string;
+  uploaded_by: string;
+  created_at: string;
+}
+
+export interface ParkingSpot {
+  id: string;
+  user_id: string;
+  spot_number: string;
+  license_plate: string;
+  make_model: string;
+  notes: string;
+  updated_at: string;
+}

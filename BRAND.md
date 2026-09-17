@@ -72,10 +72,48 @@ an Acacia-gold circular background with breathing room — is exactly what
 Acacia's guide is explicit that "tampering with or altering the logo is
 not recommended under any circumstances."
 
-## Coat of Arms / Crest (not used in this app's UI)
+## Coat of Arms / Crest
 
-For historical reference only — this app doesn't currently use the crest.
 Per *Pythagoras* (Acacia's membership manual): a gold shield bearing a
 fess and two bendlets in black, three gold triangles, a blue ribbon, and
-the motto "Human Service" inscribed in Greek. Adopted in its present form
-in 1927, modernized before the Fraternity's 2004 centennial.
+the motto "Human Service" inscribed in Greek (Ωφελούντες Ανθρώπους).
+Adopted in its present form in 1927, modernized before the Fraternity's
+2004 centennial.
+
+Downloaded directly from acacia.org's graphics library into
+[`public/brand/`](public/brand/) (`crest-full-color.png`,
+`crest-black.png`) — Acacia only ever ships this artwork on a white
+background, so it's always shown inside its own white chip
+([`src/components/acacia-crest.tsx`](src/components/acacia-crest.tsx))
+regardless of the surrounding theme. Used in the nav header's top-left
+corner throughout the app, and as one of the two selectable home-screen
+icons in Personalization (see below).
+
+## Personalization: theme and home-screen icon
+
+Two device-level preferences, both stored as cookies (not account data —
+matches how most apps treat "is this device in dark mode" as a per-device
+setting, not a synced one) and read server-side so there's no flash of
+the wrong theme on load:
+
+- **Appearance** (`acacia-theme` cookie: light/dark/system) — sets
+  `data-theme` on `<html>` in `src/app/layout.tsx`. CSS variables for
+  background/surface/text in `src/app/globals.css` swap under both an
+  explicit `[data-theme="dark"]` selector and a
+  `prefers-color-scheme: dark` media query (for "system"), with light
+  always winning if explicitly chosen — same pattern used for
+  theme-aware Artifacts. The four Acacia brand colors themselves
+  (black/gold/green/blue) don't change between themes — they're identity,
+  not a theme token.
+- **Home-screen icon** (`acacia-icon` cookie: mark/crest) — which mark
+  shows up if someone adds the app to their phone's home screen. Both
+  `src/app/manifest.ts` (Android/Chrome's installable-PWA icons) and the
+  `apple-touch-icon` link in `src/app/layout.tsx`'s `generateMetadata`
+  (iOS) read this cookie and point at whichever of
+  `src/app/icon-mark/route.tsx` / `src/app/icon-crest/route.tsx` matches
+  — both dynamically rasterize the real brand assets to PNG at request
+  time via `next/og`'s `ImageResponse`, at whatever size the caller asks
+  for. **Limitation worth knowing**: phones cache the icon at the moment
+  you add the shortcut — changing the preference afterward doesn't
+  retroactively update an icon already on the home screen; you have to
+  remove and re-add it. Personalization's UI says this explicitly.

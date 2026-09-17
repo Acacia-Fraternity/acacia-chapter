@@ -374,6 +374,130 @@ begin
 end $$;
 
 -- ============================================================
+-- chapter_notes — meeting notes. Simple: title + freeform text (markdown-
+-- ish, rendered as preformatted text, no WYSIWYG editor). Admin-authored,
+-- everyone can read.
+-- ============================================================
+create table if not exists chapter_notes (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  content text not null default '',
+  created_by uuid not null references profiles (id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table chapter_notes enable row level security;
+
+drop policy if exists "chapter notes are viewable by any signed-in member" on chapter_notes;
+create policy "chapter notes are viewable by any signed-in member"
+  on chapter_notes for select
+  to authenticated
+  using (true);
+
+drop policy if exists "only admins can write chapter notes" on chapter_notes;
+create policy "only admins can write chapter notes"
+  on chapter_notes for all
+  to authenticated
+  using (is_admin())
+  with check (is_admin());
+
+-- ============================================================
+-- chapter_files — presentation slides / handouts. The actual file bytes
+-- live in Supabase Storage (bucket "chapter-files", created below); this
+-- table is just the metadata (title + which storage object it points to).
+-- ============================================================
+create table if not exists chapter_files (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  storage_path text not null,
+  uploaded_by uuid not null references profiles (id),
+  created_at timestamptz not null default now()
+);
+
+alter table chapter_files enable row level security;
+
+drop policy if exists "chapter files are viewable by any signed-in member" on chapter_files;
+create policy "chapter files are viewable by any signed-in member"
+  on chapter_files for select
+  to authenticated
+  using (true);
+
+drop policy if exists "only admins can manage chapter files" on chapter_files;
+create policy "only admins can manage chapter files"
+  on chapter_files for all
+  to authenticated
+  using (is_admin())
+  with check (is_admin());
+
+-- Storage bucket for the actual file bytes (slides, PDFs, etc). Private —
+-- not publicly readable by URL; every read goes through the app, which
+-- checks auth like everything else here.
+insert into storage.buckets (id, name, public)
+values ('chapter-files', 'chapter-files', false)
+on conflict (id) do nothing;
+
+drop policy if exists "chapter-files: signed-in members can read" on storage.objects;
+create policy "chapter-files: signed-in members can read"
+  on storage.objects for select
+  to authenticated
+  using (bucket_id = 'chapter-files');
+
+drop policy if exists "chapter-files: only admins can upload" on storage.objects;
+create policy "chapter-files: only admins can upload"
+  on storage.objects for insert
+  to authenticated
+  with check (bucket_id = 'chapter-files' and is_admin());
+
+drop policy if exists "chapter-files: only admins can delete" on storage.objects;
+create policy "chapter-files: only admins can delete"
+  on storage.objects for delete
+  to authenticated
+  using (bucket_id = 'chapter-files' and is_admin());
+
+-- ============================================================
+-- parking_spots — one row per brother who has a car on file. Self-service:
+-- a brother manages their own row; admins can manage anyone's (e.g. to fix
+-- a typo'd plate or remove someone who's graduated).
+-- ============================================================
+create table if not exists parking_spots (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null unique references profiles (id) on delete cascade,
+  spot_number text not null default '',
+  license_plate text not null default '',
+  make_model text not null default '',
+  notes text not null default '',
+  updated_at timestamptz not null default now()
+);
+
+alter table parking_spots enable row level security;
+
+drop policy if exists "parking info is viewable by any signed-in member" on parking_spots;
+create policy "parking info is viewable by any signed-in member"
+  on parking_spots for select
+  to authenticated
+  using (true);
+
+drop policy if exists "members manage their own parking info, admins any" on parking_spots;
+create policy "members manage their own parking info, admins any"
+  on parking_spots for insert
+  to authenticated
+  with check (auth.uid() = user_id or is_admin());
+
+drop policy if exists "members update their own parking info, admins any" on parking_spots;
+create policy "members update their own parking info, admins any"
+  on parking_spots for update
+  to authenticated
+  using (auth.uid() = user_id or is_admin())
+  with check (auth.uid() = user_id or is_admin());
+
+drop policy if exists "members delete their own parking info, admins any" on parking_spots;
+create policy "members delete their own parking info, admins any"
+  on parking_spots for delete
+  to authenticated
+  using (auth.uid() = user_id or is_admin());
+
+-- ============================================================
 -- Bootstrap the first admin. Run this SEPARATELY, once, after you've
 -- signed up in the app yourself — replace the email below with yours.
 -- Every future admin promotion after this one can be done the same

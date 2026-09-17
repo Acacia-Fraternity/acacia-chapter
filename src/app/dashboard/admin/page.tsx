@@ -43,20 +43,20 @@ export default async function AdminPage() {
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-medium text-neutral-500">Events</h2>
+        <h2 className="text-sm font-medium text-muted">Events</h2>
         <ul className="space-y-2">
           {events?.map((event) => (
             <li
               key={event.id}
-              className="rounded-lg border border-neutral-200 p-3 flex items-center justify-between"
+              className="rounded-lg border border-surface-border p-3 flex items-center justify-between"
             >
               <div>
                 <p className="font-medium">{event.name}</p>
-                <p className="text-xs text-neutral-400">
+                <p className="text-xs text-muted-foreground">
                   {new Date(event.starts_at).toLocaleString()}
                 </p>
               </div>
-              <span className="text-sm text-neutral-600">
+              <span className="text-sm text-muted">
                 {event.checkins?.[0]?.count ?? 0} checked in
               </span>
             </li>
@@ -65,10 +65,10 @@ export default async function AdminPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-medium text-neutral-500">
+        <h2 className="text-sm font-medium text-muted">
           Members &amp; permissions ({members?.length ?? 0})
         </h2>
-        <p className="text-xs text-neutral-400">
+        <p className="text-xs text-muted-foreground">
           Chat/React control whether that person can post messages or add
           reactions. Changing these (and admin status) is enforced by the
           database itself, not just this screen — see{" "}

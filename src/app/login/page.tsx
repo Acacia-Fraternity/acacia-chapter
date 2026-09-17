@@ -54,7 +54,7 @@ export default function LoginPage() {
             <AcaciaMark size={56} />
           </div>
           <h1 className="text-2xl font-bold">Acacia</h1>
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-muted">
             {mode === "sign-in" ? "Sign in to your account" : "Create an account"}
           </p>
         </div>
@@ -68,7 +68,7 @@ export default function LoginPage() {
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+                className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
               />
             </div>
           )}
@@ -80,7 +80,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
             />
           </div>
 
@@ -92,7 +92,7 @@ export default function LoginPage() {
               minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
             />
           </div>
 
@@ -110,7 +110,7 @@ export default function LoginPage() {
         <button
           type="button"
           onClick={() => setMode(mode === "sign-in" ? "sign-up" : "sign-in")}
-          className="w-full text-center text-sm text-neutral-500 hover:text-neutral-800"
+          className="w-full text-center text-sm text-muted hover:text-foreground"
         >
           {mode === "sign-in"
             ? "Need an account? Sign up"

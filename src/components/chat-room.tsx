@@ -157,7 +157,7 @@ export function ChatRoom({
                 className={`inline-block max-w-[80%] rounded-xl px-3 py-2 text-sm text-left ${
                   isMe
                     ? "bg-acacia-black text-white"
-                    : "bg-neutral-100 text-acacia-black"
+                    : "bg-surface-border text-acacia-black"
                 } ${message.pending ? "opacity-60" : ""}`}
               >
                 {!isMe && (
@@ -177,7 +177,7 @@ export function ChatRoom({
                     className={`text-xs rounded-full border px-1.5 py-0.5 ${
                       reactedByMe
                         ? "border-acacia-gold bg-acacia-gold/20"
-                        : "border-neutral-200"
+                        : "border-surface-border"
                     } disabled:opacity-50`}
                   >
                     {emoji} {count}
@@ -186,10 +186,10 @@ export function ChatRoom({
 
                 {canReact && (
                   <div className="group relative inline-block">
-                    <button className="text-xs rounded-full border border-neutral-200 px-1.5 py-0.5 text-neutral-400">
+                    <button className="text-xs rounded-full border border-surface-border px-1.5 py-0.5 text-muted-foreground">
                       +
                     </button>
-                    <div className="hidden group-hover:flex absolute z-10 bg-white border border-neutral-200 rounded-full shadow-sm px-1 py-0.5 gap-0.5 top-full mt-1">
+                    <div className="hidden group-hover:flex absolute z-10 bg-surface border border-surface-border rounded-full shadow-sm px-1 py-0.5 gap-0.5 top-full mt-1">
                       {QUICK_REACTIONS.map((emoji) => (
                         <button
                           key={emoji}
@@ -217,7 +217,7 @@ export function ChatRoom({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Message the chapter…"
-            className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="flex-1 rounded-md border border-surface-border px-3 py-2 text-sm"
           />
           <button
             type="submit"
@@ -227,7 +227,7 @@ export function ChatRoom({
           </button>
         </form>
       ) : (
-        <p className="mt-3 text-sm text-neutral-400 border border-neutral-200 rounded-md px-3 py-2">
+        <p className="mt-3 text-sm text-muted-foreground border border-surface-border rounded-md px-3 py-2">
           You don&apos;t currently have permission to send messages. Ask an admin
           if you think this is wrong.
         </p>

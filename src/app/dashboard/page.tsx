@@ -1,15 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { CheckInButton } from "@/components/check-in-button";
+import { eventStatus } from "@/lib/event-status";
 import type { Event, Checkin } from "@/lib/types";
-
-function eventStatus(event: Event): "upcoming" | "open" | "closed" {
-  const now = Date.now();
-  const start = new Date(event.starts_at).getTime();
-  const end = new Date(event.ends_at).getTime();
-  if (now < start) return "upcoming";
-  if (now > end) return "closed";
-  return "open";
-}
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -36,7 +28,7 @@ export default async function DashboardPage() {
       <h1 className="text-lg font-semibold">Events</h1>
 
       {(!events || events.length === 0) && (
-        <p className="text-sm text-neutral-500">No events yet.</p>
+        <p className="text-sm text-muted">No events yet.</p>
       )}
 
       <ul className="space-y-3">
@@ -47,14 +39,14 @@ export default async function DashboardPage() {
           return (
             <li
               key={event.id}
-              className="rounded-lg border border-neutral-200 p-4 flex items-start justify-between gap-4"
+              className="rounded-lg border border-surface-border p-4 flex items-start justify-between gap-4"
             >
               <div>
                 <p className="font-medium">{event.name}</p>
                 {event.description && (
-                  <p className="text-sm text-neutral-500">{event.description}</p>
+                  <p className="text-sm text-muted">{event.description}</p>
                 )}
-                <p className="mt-1 text-xs text-neutral-400">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {new Date(event.starts_at).toLocaleString()} –{" "}
                   {new Date(event.ends_at).toLocaleString()}
                 </p>
@@ -63,8 +55,8 @@ export default async function DashboardPage() {
                     status === "open"
                       ? "bg-acacia-green/15 text-acacia-green"
                       : status === "upcoming"
-                        ? "bg-neutral-100 text-neutral-600"
-                        : "bg-neutral-100 text-neutral-400"
+                        ? "bg-surface-border text-muted"
+                        : "bg-surface-border text-muted-foreground"
                   }`}
                 >
                   {status}
@@ -79,7 +71,7 @@ export default async function DashboardPage() {
                 ) : status === "open" ? (
                   <CheckInButton eventId={event.id} />
                 ) : (
-                  <span className="text-sm text-neutral-400">
+                  <span className="text-sm text-muted-foreground">
                     {status === "upcoming" ? "Not open yet" : "Closed"}
                   </span>
                 )}

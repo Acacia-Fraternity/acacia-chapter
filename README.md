@@ -4,16 +4,22 @@ Chapter attendance, involvement, and chat tracker, themed on Acacia
 Fraternity's real brand (see [BRAND.md](BRAND.md) for the full research —
 colors, fonts, logo usage, sourced from their official brand guide).
 
-- Brothers sign in, see open events, and check in — check-in only succeeds
-  if their phone's GPS says they're actually near the event location.
+- Brothers sign in, see open events on a list or a real calendar, and
+  check in — check-in only succeeds if their phone's GPS says they're
+  actually near the event location.
 - A shared chapter chat, with sending and reacting each independently
   gated by a per-member permission an admin controls.
+- A Chapter tab for meeting notes and uploaded slides/files.
+- A Parking tab — every brother's spot number, license plate, and
+  make/model, self-service (admins can edit anyone's).
+- A Personalization tab: light/dark/system appearance, and a choice of
+  home-screen icon (the Acacia "A" or the crest) for "Add to Home Screen."
 - Officers create events, see who showed up, and manage every member's
   role/chat/react permissions from an admin dashboard.
 
 Built with Next.js (hosted on Vercel) and Supabase (database + login +
-realtime). Both have free tiers that comfortably cover a single chapter's
-usage.
+realtime + file storage). Both have free tiers that comfortably cover a
+single chapter's usage.
 
 ## Why it's built this way (read this before touching ownership/access)
 
@@ -121,6 +127,28 @@ just the UI hiding buttons.
   request came from that UI or someone poking the API directly.
 - Chat is realtime (Supabase's Postgres change feed over a websocket, see
   `src/components/chat-room.tsx`) rather than polling.
+
+## Chapter files, Parking, and Storage
+
+`supabase/schema.sql` also creates a **private** Supabase Storage bucket
+(`chapter-files`) for slide/PDF uploads — not publicly readable by URL;
+every download in the Chapter tab goes through a signed URL generated
+server-side with a 5-minute expiry. Only admins can upload/delete;
+everyone signed in can read. Notes and files are both admin-authored,
+same pattern as events.
+
+Parking is the one self-service table: any brother can create/edit/delete
+their *own* row (RLS `auth.uid() = user_id or is_admin()`), admins can
+edit anyone's. There's no privilege-escalation risk here the way there
+was with `profiles` — editing your own parking info can't grant you
+anything — so it's a plain RLS policy, no extra trigger needed.
+
+## Personalization
+
+See [BRAND.md](BRAND.md#personalization-theme-and-home-screen-icon) for
+the full mechanism (cookies, not account data; dynamic PNG generation via
+`next/og` for the home-screen icon; the "you have to re-add the shortcut"
+caveat).
 
 ## Local development
 

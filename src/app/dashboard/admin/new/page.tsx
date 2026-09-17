@@ -13,7 +13,7 @@ export default function NewEventPage() {
             name="name"
             type="text"
             required
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
           />
         </div>
 
@@ -22,7 +22,7 @@ export default function NewEventPage() {
           <textarea
             name="description"
             rows={2}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
           />
         </div>
 
@@ -38,7 +38,7 @@ export default function NewEventPage() {
             defaultValue={100}
             min={5}
             required
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
           />
         </div>
 
@@ -49,7 +49,7 @@ export default function NewEventPage() {
               name="starts_at"
               type="datetime-local"
               required
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
             />
           </div>
           <div>
@@ -58,7 +58,7 @@ export default function NewEventPage() {
               name="ends_at"
               type="datetime-local"
               required
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
             />
           </div>
         </div>

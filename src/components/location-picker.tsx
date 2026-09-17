@@ -29,7 +29,7 @@ export function LocationPicker() {
         <button
           type="button"
           onClick={useCurrentLocation}
-          className="text-xs text-neutral-500 hover:text-neutral-800 underline"
+          className="text-xs text-muted hover:text-foreground underline"
         >
           {status === "locating" ? "Locating…" : "Use my current location"}
         </button>
@@ -48,7 +48,7 @@ export function LocationPicker() {
           onChange={(e) =>
             setCoords((c) => ({ lat: Number(e.target.value), lng: c?.lng ?? 0 }))
           }
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="rounded-md border border-surface-border px-3 py-2 text-sm"
         />
         <input
           name="longitude"
@@ -60,7 +60,7 @@ export function LocationPicker() {
           onChange={(e) =>
             setCoords((c) => ({ lat: c?.lat ?? 0, lng: Number(e.target.value) }))
           }
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className="rounded-md border border-surface-border px-3 py-2 text-sm"
         />
       </div>
     </div>

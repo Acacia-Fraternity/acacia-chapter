@@ -3,20 +3,55 @@
 :root {
   --background: #ffffff;
   --foreground: #1e1e1e;
+  --surface: #ffffff;
+  --surface-border: #e5e5e5;
+  --muted: #737373;
+  --muted-foreground: #a3a3a3;
 
   /* Acacia Fraternity brand palette — sourced from the 2019 Acacia Brand
      Guide (primary colors, used most frequently: black + gold; secondary
      colors, used less frequently: green + blue). Do not tweak these hex
-     values without checking the guide — they're exact PMS conversions. */
+     values without checking the guide — they're exact PMS conversions.
+     These stay fixed across light/dark — they're brand identity, not
+     theme-dependent surface colors. */
   --acacia-black: #1e1e1e;
   --acacia-gold: #f9e547;
   --acacia-green: #008675;
   --acacia-blue: #003d4c;
 }
 
+/* Personalization tab writes an `acacia-theme` cookie (light/dark/system),
+   read server-side in src/app/layout.tsx and applied as data-theme on
+   <html> before first paint — no flash. "system" means no attribute at
+   all, so the media query below is the only thing that applies; explicit
+   light/dark always wins over the OS preference. */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme="light"]) {
+    --background: #141414;
+    --foreground: #f2f2f2;
+    --surface: #1e1e1e;
+    --surface-border: #3a3a3a;
+    --muted: #b5b5b5;
+    --muted-foreground: #8a8a8a;
+  }
+}
+
+html[data-theme="dark"] {
+  --background: #141414;
+  --foreground: #f2f2f2;
+  --surface: #1e1e1e;
+  --surface-border: #3a3a3a;
+  --muted: #b5b5b5;
+  --muted-foreground: #8a8a8a;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-border: var(--surface-border);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
   --color-acacia-black: var(--acacia-black);
   --color-acacia-gold: var(--acacia-gold);
   --color-acacia-green: var(--acacia-green);
