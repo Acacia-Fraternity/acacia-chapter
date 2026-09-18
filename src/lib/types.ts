@@ -7,6 +7,8 @@ export interface Profile {
   created_at: string;
 }
 
+export type EventCategory = "chapter_meeting" | "social" | "philanthropy" | "other";
+
 export interface Event {
   id: string;
   name: string;
@@ -16,6 +18,7 @@ export interface Event {
   longitude: number;
   radius_meters: number;
   hours: number;
+  category: EventCategory;
   starts_at: string;
   ends_at: string;
   created_by: string;
@@ -47,6 +50,14 @@ export interface ChapterFile {
   title: string;
   storage_path: string;
   uploaded_by: string;
+  created_at: string;
+}
+
+export interface Task {
+  id: string;
+  user_id: string;
+  title: string;
+  done: boolean;
   created_at: string;
 }
 

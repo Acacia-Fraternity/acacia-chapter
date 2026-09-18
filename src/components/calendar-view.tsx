@@ -3,7 +3,15 @@
 import { useMemo, useState } from "react";
 import { CheckInButton } from "@/components/check-in-button";
 import { eventStatus } from "@/lib/event-status";
+import { categoryLabel, categoryBadgeClass } from "@/lib/event-category";
 import type { Event } from "@/lib/types";
+
+const CATEGORY_DOT_CLASS: Record<Event["category"], string> = {
+  chapter_meeting: "bg-acacia-blue",
+  social: "bg-acacia-gold",
+  philanthropy: "bg-acacia-green",
+  other: "bg-muted-foreground",
+};
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -126,7 +134,7 @@ export function CalendarView({
                 {dayEvents.slice(0, 3).map((e) => (
                   <span
                     key={e.id}
-                    className="h-1.5 w-1.5 rounded-full bg-acacia-green"
+                    className={`h-1.5 w-1.5 rounded-full ${CATEGORY_DOT_CLASS[e.category]}`}
                     title={e.name}
                   />
                 ))}
@@ -178,11 +186,18 @@ export function CalendarView({
                   {event.address && (
                     <p className="text-xs text-muted-foreground">{event.address}</p>
                   )}
-                  {event.hours > 0 && (
-                    <span className="mt-1 inline-block rounded-full bg-acacia-gold text-acacia-black px-2 py-0.5 text-xs font-medium">
-                      {event.hours} hr{event.hours === 1 ? "" : "s"}
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <span
+                      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${categoryBadgeClass(event.category)}`}
+                    >
+                      {categoryLabel(event.category)}
                     </span>
-                  )}
+                    {event.hours > 0 && (
+                      <span className="inline-block rounded-full bg-acacia-gold text-acacia-black px-2 py-0.5 text-xs font-medium">
+                        {event.hours} hr{event.hours === 1 ? "" : "s"}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="shrink-0">
                   {alreadyCheckedIn ? (

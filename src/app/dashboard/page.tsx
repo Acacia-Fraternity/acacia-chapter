@@ -1,103 +1,87 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { CheckInButton } from "@/components/check-in-button";
-import { eventStatus } from "@/lib/event-status";
-import type { Event, Checkin } from "@/lib/types";
+import { TaskList } from "@/components/task-list";
+import { categoryLabel, categoryBadgeClass } from "@/lib/event-category";
+import type { Profile, Task, Event } from "@/lib/types";
 
-export default async function DashboardPage() {
+export default async function HomePage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: events } = await supabase
-    .from("events")
-    .select("*")
-    .order("starts_at", { ascending: false })
-    .returns<Event[]>();
+  const [{ data: profile }, { data: tasks }, { data: upcoming }] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", user!.id).single<Profile>(),
+    supabase
+      .from("tasks")
+      .select("*")
+      .eq("user_id", user!.id)
+      .order("created_at", { ascending: true })
+      .returns<Task[]>(),
+    supabase
+      .from("events")
+      .select("*")
+      .gte("ends_at", new Date().toISOString())
+      .order("starts_at", { ascending: true })
+      .limit(5)
+      .returns<Event[]>(),
+  ]);
 
-  const { data: myCheckins } = await supabase
-    .from("checkins")
-    .select("*")
-    .eq("user_id", user!.id)
-    .returns<Checkin[]>();
-
-  const checkedInEventIds = new Set((myCheckins ?? []).map((c) => c.event_id));
-  const totalHours = (myCheckins ?? []).reduce((sum, c) => sum + Number(c.hours_earned), 0);
+  const firstName = (profile?.full_name || "").trim().split(/\s+/)[0] || "brother";
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Events</h1>
-        {totalHours > 0 && (
-          <span className="text-sm text-acacia-green font-medium">
-            {totalHours} hour{totalHours === 1 ? "" : "s"} earned
-          </span>
-        )}
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-2xl font-bold">
+          Hello, brother {firstName}
+        </h1>
+        <p className="text-sm text-muted">Here&apos;s what&apos;s going on.</p>
       </div>
 
-      {(!events || events.length === 0) && (
-        <p className="text-sm text-muted">No events yet.</p>
-      )}
+      <section className="space-y-3">
+        <h2 className="text-sm font-medium text-muted">Your to-do list</h2>
+        <TaskList initialTasks={tasks ?? []} />
+      </section>
 
-      <ul className="space-y-3">
-        {events?.map((event) => {
-          const status = eventStatus(event);
-          const alreadyCheckedIn = checkedInEventIds.has(event.id);
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium text-muted">Upcoming events</h2>
+          <Link href="/dashboard/events" className="text-xs text-acacia-blue hover:underline">
+            View all
+          </Link>
+        </div>
 
-          return (
+        {(!upcoming || upcoming.length === 0) && (
+          <p className="text-sm text-muted-foreground">Nothing coming up.</p>
+        )}
+
+        <ul className="space-y-2">
+          {upcoming?.map((event) => (
             <li
               key={event.id}
-              className="rounded-lg border border-surface-border p-4 flex items-start justify-between gap-4"
+              className="rounded-lg border border-surface-border p-3 flex items-center justify-between gap-3"
             >
               <div>
-                <p className="font-medium">{event.name}</p>
-                {event.description && (
-                  <p className="text-sm text-muted">{event.description}</p>
-                )}
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {new Date(event.starts_at).toLocaleString()} –{" "}
-                  {new Date(event.ends_at).toLocaleString()}
+                <p className="text-sm font-medium">{event.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(event.starts_at).toLocaleString(undefined, {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
                 </p>
-                {event.address && (
-                  <p className="text-xs text-muted-foreground">{event.address}</p>
-                )}
-                <div className="mt-2 flex items-center gap-1.5">
-                  <span
-                    className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-                      status === "open"
-                        ? "bg-acacia-green/15 text-acacia-green"
-                        : status === "upcoming"
-                          ? "bg-surface-border text-muted"
-                          : "bg-surface-border text-muted-foreground"
-                    }`}
-                  >
-                    {status}
-                  </span>
-                  {event.hours > 0 && (
-                    <span className="inline-block rounded-full bg-acacia-gold text-acacia-black px-2 py-0.5 text-xs font-medium">
-                      {event.hours} hr{event.hours === 1 ? "" : "s"}
-                    </span>
-                  )}
-                </div>
               </div>
-
-              <div className="shrink-0">
-                {alreadyCheckedIn ? (
-                  <span className="text-sm text-acacia-green font-medium">
-                    ✓ Checked in
-                  </span>
-                ) : status === "open" ? (
-                  <CheckInButton eventId={event.id} />
-                ) : (
-                  <span className="text-sm text-muted-foreground">
-                    {status === "upcoming" ? "Not open yet" : "Closed"}
-                  </span>
-                )}
-              </div>
+              <span
+                className={`shrink-0 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${categoryBadgeClass(event.category)}`}
+              >
+                {categoryLabel(event.category)}
+              </span>
             </li>
-          );
-        })}
-      </ul>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

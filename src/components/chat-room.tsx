@@ -143,7 +143,7 @@ export function ChatRoom({
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)]">
+    <div className="flex flex-col h-[calc(100vh-6rem)]">
       <h1 className="text-lg font-semibold mb-3">Chat</h1>
 
       <div className="flex-1 overflow-y-auto space-y-3 pr-1">

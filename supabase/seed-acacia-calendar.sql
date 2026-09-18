@@ -360,3 +360,27 @@ from (select id from profiles where role = 'admin' order by created_at limit 1) 
     '2026-12-17 00:00'::timestamp AT TIME ZONE 'America/Indiana/Indianapolis',
     '2026-12-18 00:00'::timestamp AT TIME ZONE 'America/Indiana/Indianapolis')
 ) as v(name, description, address, latitude, longitude, radius_meters, hours, starts_at, ends_at);
+
+-- Categorize what's inferable from the event name (everything else keeps
+-- the 'other' default) — only touches rows this script just inserted,
+-- scoped to created_at within the last minute so re-running this file
+-- doesn't reach back and reclassify unrelated events an admin already
+-- categorized by hand.
+update events set category = 'chapter_meeting'
+where created_at > now() - interval '1 minute'
+  and (
+    name in ('Chapter', 'Exec Meeting', 'Pledge Exam', 'Hazing Prevention Meeting')
+    or name ilike 'Deans Meeting%'
+    or name ilike 'IFC Presidents Chapter%'
+    or name ilike 'Elections%'
+  );
+
+update events set category = 'social'
+where created_at > now() - interval '1 minute'
+  and (
+    name ilike 'Party%'
+    or name ilike '%Tailgate%'
+    or name ilike 'Brotherhood Event%'
+    or name ilike '%Homecoming%'
+    or name ilike 'Formal%'
+  );

@@ -22,8 +22,8 @@ export function AcaciaMark({
         <Image
           src="/brand/acacia-logo-black.svg"
           alt="Acacia"
-          width={size * 0.55}
-          height={size * 0.55}
+          width={size * 0.72}
+          height={size * 0.72}
         />
       </span>
     );

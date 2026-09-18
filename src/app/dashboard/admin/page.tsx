@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MemberPermissionsRow } from "@/components/member-permissions-row";
+import { AddMemberForm } from "@/components/add-member-form";
 import type { Event, Profile, Checkin } from "@/lib/types";
 
 export default async function AdminPage() {
@@ -87,6 +88,9 @@ export default async function AdminPage() {
           database itself, not just this screen — see{" "}
           <code>supabase/schema.sql</code>.
         </p>
+
+        <AddMemberForm />
+
         <ul className="space-y-1.5">
           {members?.map((member) => (
             <MemberPermissionsRow

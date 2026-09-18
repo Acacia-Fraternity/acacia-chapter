@@ -1,5 +1,6 @@
 import { createEvent } from "./actions";
 import { LocationPicker } from "@/components/location-picker";
+import { EVENT_CATEGORIES } from "@/lib/event-category";
 
 export default function NewEventPage() {
   return (
@@ -27,6 +28,21 @@ export default function NewEventPage() {
         </div>
 
         <LocationPicker />
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Type</label>
+          <select
+            name="category"
+            defaultValue="other"
+            className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
+          >
+            {EVENT_CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div className="grid grid-cols-2 gap-2">
           <div>

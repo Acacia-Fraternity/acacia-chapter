@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
           justifyContent: "center",
         }}
       >
-        <svg width={size * 0.55} height={size * 0.55} viewBox="0 0 800 800">
+        <svg width={size * 0.72} height={size * 0.72} viewBox="0 0 800 800">
           <path
             fill="#1E1E1E"
             d="M515.46,505.43l-90.24-228.34h-85.81l12.89,32.04l-42.76,112.27c-2.18,0.17-4.41,0.29-6.2,0.29

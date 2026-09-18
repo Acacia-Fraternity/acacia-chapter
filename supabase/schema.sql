@@ -135,11 +135,21 @@ create table if not exists events (
   -- event where attendance counts toward a requirement. 0 for a normal
   -- meeting/social that doesn't award anything.
   hours numeric not null default 0,
+  category text not null default 'other'
+    check (category in ('chapter_meeting', 'social', 'philanthropy', 'other')),
   starts_at timestamptz not null,
   ends_at timestamptz not null,
   created_by uuid not null references profiles (id),
   created_at timestamptz not null default now()
 );
+
+-- `create table if not exists` above does nothing to a table that already
+-- exists (this ran once already before `category` existed) — this is what
+-- actually adds the column to a live database. Safe to re-run.
+alter table events add column if not exists category text not null default 'other';
+alter table events drop constraint if exists events_category_check;
+alter table events add constraint events_category_check
+  check (category in ('chapter_meeting', 'social', 'philanthropy', 'other'));
 
 alter table events enable row level security;
 
@@ -510,6 +520,30 @@ create policy "members delete their own parking info, admins any"
   on parking_spots for delete
   to authenticated
   using (auth.uid() = user_id or is_admin());
+
+-- ============================================================
+-- tasks — a personal to-do list per brother, shown on the Home page.
+-- Purely private: unlike everything else in this app, nobody (not even
+-- an admin) can see anyone else's tasks — there's no chapter-wide reason
+-- to, and it's the kind of thing (errands, personal reminders) people
+-- wouldn't want visible to others by default.
+-- ============================================================
+create table if not exists tasks (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references profiles (id) on delete cascade,
+  title text not null,
+  done boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table tasks enable row level security;
+
+drop policy if exists "members manage only their own tasks" on tasks;
+create policy "members manage only their own tasks"
+  on tasks for all
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 -- ============================================================
 -- Bootstrap the first admin. Run this SEPARATELY, once, after you've
