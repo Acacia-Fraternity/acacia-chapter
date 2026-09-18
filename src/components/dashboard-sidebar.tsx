@@ -11,8 +11,8 @@ import {
   Car,
   Palette,
   ShieldCheck,
-  ChevronsLeft,
-  ChevronsRight,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import { AcaciaCrest } from "@/components/acacia-crest";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -25,7 +25,7 @@ const NAV_LINKS = [
   { href: "/dashboard/parking", label: "Parking", icon: Car },
 ];
 
-const STORAGE_KEY = "acacia-sidebar-collapsed";
+const STORAGE_KEY = "acacia-sidebar-pinned";
 
 export function DashboardSidebar({
   fullName,
@@ -35,25 +35,26 @@ export function DashboardSidebar({
   isAdmin: boolean;
 }) {
   const pathname = usePathname();
+  // "Pinned" keeps it expanded permanently. Not pinned (the default): it
+  // rests collapsed to icons and only expands while the mouse is over it.
   // Starts false so the client's first render matches the server-rendered
   // HTML (no window/localStorage during SSR) — the effect below then syncs
-  // in the real saved value right after hydration. Setting state directly
-  // in an effect is normally an anti-pattern, but reading a browser-only
-  // API like localStorage genuinely can't happen any earlier than this.
-  const [collapsed, setCollapsed] = useState(false);
+  // in the real saved value right after hydration.
+  const [pinned, setPinned] = useState(false);
+  const [hovering, setHovering] = useState(false);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY) === "1";
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (saved) setCollapsed(true);
+      if (saved) setPinned(true);
     } catch {
-      // localStorage unavailable — keep the default (expanded).
+      // localStorage unavailable — keep the default (unpinned).
     }
   }, []);
 
-  function toggleCollapsed() {
-    setCollapsed((prev) => {
+  function togglePinned() {
+    setPinned((prev) => {
       const next = !prev;
       try {
         localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
@@ -68,12 +69,14 @@ export function DashboardSidebar({
     ? [...NAV_LINKS, { href: "/dashboard/admin", label: "Admin", icon: ShieldCheck }]
     : NAV_LINKS;
 
-  const showLabels = !collapsed;
-  const widthClass = collapsed ? "w-16" : "w-16 sm:w-56";
+  const expanded = pinned || hovering;
+  const widthClass = expanded ? "w-16 sm:w-56" : "w-16";
 
   return (
     <aside
-      className={`${widthClass} shrink-0 bg-acacia-black text-white flex flex-col h-screen sticky top-0 transition-[width] duration-150`}
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
+      className={`${widthClass} shrink-0 bg-acacia-black text-white flex flex-col h-screen sticky top-0 transition-[width] duration-150 z-20`}
     >
       <div className="flex items-center justify-between px-3 sm:px-4 py-4 border-b border-white/10">
         <Link
@@ -81,15 +84,17 @@ export function DashboardSidebar({
           className="flex items-center gap-2 font-bold min-w-0"
         >
           <AcaciaCrest size={32} />
-          {showLabels && <span className="hidden sm:inline truncate">Acacia</span>}
+          {expanded && <span className="hidden sm:inline truncate">Acacia</span>}
         </Link>
-        <button
-          onClick={toggleCollapsed}
-          className="hidden sm:block text-neutral-400 hover:text-acacia-gold shrink-0"
-          title={collapsed ? "Expand" : "Collapse"}
-        >
-          {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
-        </button>
+        {expanded && (
+          <button
+            onClick={togglePinned}
+            className="hidden sm:block text-neutral-400 hover:text-acacia-gold shrink-0"
+            title={pinned ? "Unpin (auto-collapse)" : "Pin sidebar open"}
+          >
+            {pinned ? <PinOff size={16} /> : <Pin size={16} />}
+          </button>
+        )}
       </div>
 
       <nav className="flex-1 overflow-y-auto py-2">
@@ -103,7 +108,7 @@ export function DashboardSidebar({
               href={link.href}
               title={link.label}
               className={`flex items-center gap-3 px-3 sm:px-4 py-2.5 text-sm ${
-                collapsed ? "justify-center" : "justify-center sm:justify-start"
+                expanded ? "justify-center sm:justify-start" : "justify-center"
               } ${
                 isActive
                   ? "bg-white/10 text-acacia-gold border-l-2 border-acacia-gold"
@@ -111,14 +116,14 @@ export function DashboardSidebar({
               }`}
             >
               <Icon size={20} className="shrink-0" />
-              {showLabels && <span className="hidden sm:inline">{link.label}</span>}
+              {expanded && <span className="hidden sm:inline">{link.label}</span>}
             </Link>
           );
         })}
       </nav>
 
       <div className="border-t border-white/10 px-3 sm:px-4 py-3 space-y-2">
-        {showLabels && (
+        {expanded && (
           <span className="hidden sm:block text-sm text-neutral-300 truncate">
             {fullName}
           </span>
@@ -127,13 +132,13 @@ export function DashboardSidebar({
           href="/dashboard/personalization"
           title="Personalization"
           className={`flex items-center gap-3 text-sm text-neutral-300 hover:text-acacia-gold ${
-            collapsed ? "justify-center" : "justify-center sm:justify-start"
+            expanded ? "justify-center sm:justify-start" : "justify-center"
           }`}
         >
           <Palette size={18} className="shrink-0" />
-          {showLabels && <span className="hidden sm:inline">Personalization</span>}
+          {expanded && <span className="hidden sm:inline">Personalization</span>}
         </Link>
-        <div className={collapsed ? "flex justify-center" : "flex justify-center sm:justify-start"}>
+        <div className={expanded ? "flex justify-center sm:justify-start" : "flex justify-center"}>
           <SignOutButton />
         </div>
       </div>
