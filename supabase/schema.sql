@@ -16,8 +16,17 @@ create table if not exists profiles (
   -- touching their membership status at all.
   can_chat boolean not null default true,
   can_react boolean not null default true,
+  -- Housing status for the House Presence tab — whether this brother is
+  -- assigned to live in the chapter house at all, distinct from whether
+  -- they're *currently* there (house_presence_sessions tracks that).
+  lives_in_house boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+-- `create table if not exists` above is a no-op on a table that already
+-- exists (this ran once already before lives_in_house existed) — this is
+-- what actually adds the column to a live database. Safe to re-run.
+alter table profiles add column if not exists lives_in_house boolean not null default false;
 
 alter table profiles enable row level security;
 
@@ -544,6 +553,116 @@ create policy "members manage only their own tasks"
   to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- ============================================================
+-- house_presence_sessions — tracks time spent at the chapter house, for
+-- the House Presence tab. IMPORTANT LIMITATION (by design, not a bug):
+-- phones do not allow background location access for web apps — iOS in
+-- particular gives web content zero location access once the app isn't
+-- on-screen. So this can only ever be "time the app was open near the
+-- house," logged two ways: automatically while the app happens to be
+-- open (src/components/presence-tracker.tsx pings periodically), or a
+-- manual "I'm home" / "I'm leaving" toggle to cover the gaps. True 24/7
+-- presence tracking would require a native iOS/Android app with
+-- "Always Allow" location permission — a separate project entirely,
+-- not something a website can do regardless of user consent.
+--
+-- At most one OPEN session (ended_at is null) per user at a time,
+-- enforced by the partial unique index below — log_presence_ping()
+-- either continues that open session (bumping last_ping_at) or closes
+-- it, depending on whether the caller's coordinates are still within
+-- range of the house.
+-- ============================================================
+create table if not exists house_presence_sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references profiles (id) on delete cascade,
+  started_at timestamptz not null default now(),
+  -- Bumped on every heartbeat while the session is open — lets the app
+  -- tell "still here, just hasn't pinged in a bit" apart from "actually
+  -- ended," without needing a cron job to close stale sessions.
+  last_ping_at timestamptz not null default now(),
+  ended_at timestamptz,
+  source text not null default 'auto' check (source in ('auto', 'manual'))
+);
+
+create unique index if not exists house_presence_one_open_session
+  on house_presence_sessions (user_id)
+  where ended_at is null;
+
+alter table house_presence_sessions enable row level security;
+
+drop policy if exists "presence sessions are viewable by any signed-in member" on house_presence_sessions;
+create policy "presence sessions are viewable by any signed-in member"
+  on house_presence_sessions for select
+  to authenticated
+  using (true);
+
+-- No direct insert/update policy for regular clients — every write goes
+-- through log_presence_ping()/log_presence_leave() below, same reasoning
+-- as checkins/messages: the geofence check can't be bypassed by calling
+-- the table directly.
+
+create or replace function log_presence_ping(p_lat double precision, p_lng double precision)
+returns house_presence_sessions
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  house_lat constant double precision := 39.1639078;
+  house_lng constant double precision := -86.5255585;
+  house_radius constant double precision := 150;
+  v_within boolean;
+  v_row house_presence_sessions;
+begin
+  v_within := haversine_meters(p_lat, p_lng, house_lat, house_lng) <= house_radius;
+
+  select * into v_row from house_presence_sessions
+  where user_id = auth.uid() and ended_at is null;
+
+  if v_within then
+    if v_row.id is null then
+      insert into house_presence_sessions (user_id, started_at, last_ping_at, source)
+      values (auth.uid(), now(), now(), 'auto')
+      returning * into v_row;
+    else
+      update house_presence_sessions set last_ping_at = now()
+      where id = v_row.id
+      returning * into v_row;
+    end if;
+  else
+    if v_row.id is not null then
+      update house_presence_sessions set ended_at = now()
+      where id = v_row.id
+      returning * into v_row;
+    end if;
+  end if;
+
+  return v_row;
+end;
+$$;
+
+grant execute on function log_presence_ping(double precision, double precision) to authenticated;
+
+-- Explicit "I'm leaving" — no geofence check, since someone declaring
+-- they're leaving might already be out of range or losing signal in a car.
+create or replace function log_presence_leave()
+returns house_presence_sessions
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_row house_presence_sessions;
+begin
+  update house_presence_sessions
+  set ended_at = now()
+  where user_id = auth.uid() and ended_at is null
+  returning * into v_row;
+
+  return v_row;
+end;
+$$;
+
+grant execute on function log_presence_leave() to authenticated;
 
 -- ============================================================
 -- Bootstrap the first admin. Run this SEPARATELY, once, after you've

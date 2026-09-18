@@ -4,6 +4,7 @@ export interface Profile {
   role: "member" | "admin";
   can_chat: boolean;
   can_react: boolean;
+  lives_in_house: boolean;
   created_at: string;
 }
 
@@ -59,6 +60,15 @@ export interface Task {
   title: string;
   done: boolean;
   created_at: string;
+}
+
+export interface HousePresenceSession {
+  id: string;
+  user_id: string;
+  started_at: string;
+  last_ping_at: string;
+  ended_at: string | null;
+  source: "auto" | "manual";
 }
 
 export interface ParkingSpot {

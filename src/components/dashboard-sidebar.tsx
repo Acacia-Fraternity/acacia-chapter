@@ -9,6 +9,7 @@ import {
   MessageSquare,
   BookOpen,
   Car,
+  Home,
   Palette,
   ShieldCheck,
   Pin,
@@ -22,6 +23,7 @@ const NAV_LINKS = [
   { href: "/dashboard/calendar", label: "Calendar", icon: Calendar },
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
   { href: "/dashboard/chapter", label: "Chapter", icon: BookOpen },
+  { href: "/dashboard/house-presence", label: "House Presence", icon: Home },
   { href: "/dashboard/parking", label: "Parking", icon: Car },
 ];
 

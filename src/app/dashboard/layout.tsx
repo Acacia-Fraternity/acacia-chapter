@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardSidebar } from "@/components/dashboard-sidebar";
+import { PresenceTracker } from "@/components/presence-tracker";
 import type { Profile } from "@/lib/types";
 
 export default async function DashboardLayout({
@@ -23,6 +24,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex flex-1">
+      <PresenceTracker />
       <DashboardSidebar
         fullName={profile?.full_name ?? ""}
         isAdmin={profile?.role === "admin"}
