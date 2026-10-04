@@ -5,6 +5,7 @@ import {
   setMemberRole,
   setMemberCanChat,
   setMemberCanReact,
+  setMemberIsPledge,
 } from "@/app/dashboard/admin/actions";
 import type { Profile } from "@/lib/types";
 
@@ -65,6 +66,18 @@ export function MemberPermissionsRow({
               }
             />
             React
+          </label>
+
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={member.is_pledge}
+              disabled={isPending}
+              onChange={(e) =>
+                run(() => setMemberIsPledge(member.id, e.target.checked))
+              }
+            />
+            Pledge
           </label>
 
           <select

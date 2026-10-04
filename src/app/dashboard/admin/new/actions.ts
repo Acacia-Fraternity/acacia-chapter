@@ -13,7 +13,8 @@ export async function createEvent(formData: FormData) {
   const longitude = Number(formData.get("longitude"));
   const radiusMeters = Number(formData.get("radius_meters"));
   const hours = Number(formData.get("hours") ?? 0);
-  const category = String(formData.get("category") ?? "other");
+  const housePoints = Math.max(0, Math.trunc(Number(formData.get("house_points") ?? 0)));
+  const category =String(formData.get("category") ?? "other");
   const startsAt = String(formData.get("starts_at"));
   const endsAt = String(formData.get("ends_at"));
 
@@ -31,6 +32,7 @@ export async function createEvent(formData: FormData) {
     longitude,
     radius_meters: radiusMeters,
     hours,
+    house_points: housePoints,
     category,
     starts_at: new Date(startsAt).toISOString(),
     ends_at: new Date(endsAt).toISOString(),

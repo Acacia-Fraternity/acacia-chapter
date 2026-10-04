@@ -77,6 +77,21 @@ export default function NewEventPage() {
           </div>
         </div>
 
+        <div>
+          <label className="block text-sm font-medium mb-1">House points</label>
+          <input
+            name="house_points"
+            type="number"
+            min={0}
+            defaultValue={0}
+            className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Points a brother earns toward house points. Leave 0 if this event
+            isn&apos;t worth points.
+          </p>
+        </div>
+
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="block text-sm font-medium mb-1">Starts</label>

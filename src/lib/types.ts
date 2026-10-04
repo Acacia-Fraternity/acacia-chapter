@@ -5,6 +5,7 @@ export interface Profile {
   can_chat: boolean;
   can_react: boolean;
   lives_in_house: boolean;
+  is_pledge: boolean;
   created_at: string;
 }
 
@@ -19,6 +20,7 @@ export interface Event {
   longitude: number;
   radius_meters: number;
   hours: number;
+  house_points: number;
   category: EventCategory;
   starts_at: string;
   ends_at: string;
@@ -33,7 +35,11 @@ export interface Checkin {
   latitude: number;
   longitude: number;
   distance_meters: number;
+  accuracy_meters: number | null;
+  flagged_suspicious: boolean;
+  flag_reason: string | null;
   hours_earned: number;
+  checked_out_at: string | null;
   checked_in_at: string;
 }
 
@@ -79,4 +85,41 @@ export interface ParkingSpot {
   make_model: string;
   notes: string;
   updated_at: string;
+}
+
+export interface EventPresence {
+  event_id: string;
+  user_id: string;
+  minutes_on_site: number;
+}
+
+export interface EventFile {
+  id: string;
+  event_id: string;
+  title: string;
+  storage_path: string;
+  uploaded_by: string;
+  created_at: string;
+}
+
+export type RsvpStatus = "going" | "maybe" | "not_going";
+
+export interface EventRsvp {
+  event_id: string;
+  user_id: string;
+  status: RsvpStatus;
+}
+
+export interface EventExcuse {
+  event_id: string;
+  user_id: string;
+  reason: string;
+  status: "pending" | "approved" | "denied";
+}
+
+export interface EventFeedback {
+  event_id: string;
+  user_id: string;
+  rating: number;
+  comments: string;
 }

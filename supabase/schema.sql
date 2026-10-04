@@ -27,6 +27,9 @@ create table if not exists profiles (
 -- exists (this ran once already before lives_in_house existed) — this is
 -- what actually adds the column to a live database. Safe to re-run.
 alter table profiles add column if not exists lives_in_house boolean not null default false;
+-- Pledges get their own House Presence filter; admin-controlled (guarded by
+-- prevent_self_privilege_escalation below, like role).
+alter table profiles add column if not exists is_pledge boolean not null default false;
 
 alter table profiles enable row level security;
 
@@ -90,12 +93,18 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  if not is_admin() and (
+  -- auth.uid() is null for direct database access (the Supabase SQL Editor,
+  -- migrations) — not an app user, so there's no one to escalate. Every
+  -- policy on profiles is `to authenticated`, so the API can never reach
+  -- here without a uid. Without this, the very first admin can't be
+  -- bootstrapped from the SQL Editor.
+  if auth.uid() is not null and not is_admin() and (
     new.role is distinct from old.role
     or new.can_chat is distinct from old.can_chat
     or new.can_react is distinct from old.can_react
+    or new.is_pledge is distinct from old.is_pledge
   ) then
-    raise exception 'Only an admin can change role, can_chat, or can_react';
+    raise exception 'Only an admin can change role, can_chat, can_react, or pledge status';
   end if;
   return new;
 end;
@@ -212,6 +221,15 @@ create table if not exists checkins (
 
 alter table checkins enable row level security;
 
+-- Anti-spoofing hardening, added after the fact — see check_in() below.
+-- accuracy_meters is the browser Geolocation API's own reported margin of
+-- error; flagged_suspicious/flag_reason let a check-in that COULD be real
+-- (unlike a plain out-of-radius rejection) still succeed but visibly warn
+-- an admin, since these records affect real philanthropy-hours credit.
+alter table checkins add column if not exists accuracy_meters double precision;
+alter table checkins add column if not exists flagged_suspicious boolean not null default false;
+alter table checkins add column if not exists flag_reason text;
+
 drop policy if exists "members see their own checkins, admins see all" on checkins;
 create policy "members see their own checkins, admins see all"
   on checkins for select
@@ -238,18 +256,38 @@ as $$
   );
 $$;
 
+-- Browser geolocation can't give us Android's isFromMockProvider (that
+-- signal only exists in a native app) — so the two checks below are the
+-- honest subset of the pasted anti-spoofing advice that's actually
+-- possible from a PWA:
+--   1. Reject a reading whose OWN reported accuracy is too poor to trust
+--      (accuracy worse than this means the browser fell back to
+--      wifi/IP-based positioning, not a real GPS fix — the "distance ≤
+--      radius" check is meaningless if the position itself has a 500m
+--      margin of error). This is a hard reject: ask the member to wait a
+--      few seconds for a GPS lock and retry.
+--   2. Flag (not reject) a checkin that implies impossible travel speed
+--      since their last checkin anywhere. This can't distinguish "spoofed"
+--      from "GPS drift/legitimately drove fast," so it only flags the row
+--      for an admin to glance at later rather than blocking it.
 create or replace function check_in(
   p_event_id uuid,
   p_lat double precision,
-  p_lng double precision
+  p_lng double precision,
+  p_accuracy double precision default null
 )
 returns checkins
 language plpgsql
 security definer set search_path = public
 as $$
 declare
+  v_max_accuracy_meters constant double precision := 100;
+  v_max_speed_mps constant double precision := 45; -- ~100 mph, generous above real driving speeds
   v_event events;
   v_distance double precision;
+  v_prev checkins;
+  v_flagged boolean := false;
+  v_flag_reason text;
   v_row checkins;
 begin
   select * into v_event from events where id = p_event_id;
@@ -262,6 +300,16 @@ begin
     raise exception 'This event is not currently open for check-in';
   end if;
 
+  if p_accuracy is not null and p_accuracy > v_max_accuracy_meters then
+    raise exception 'Your location signal is too weak (± % m) to check in — move somewhere with a clearer sky view and try again',
+      round(p_accuracy);
+  end if;
+
+  if p_accuracy is null then
+    v_flagged := true;
+    v_flag_reason := 'No location accuracy reported by the browser';
+  end if;
+
   v_distance := haversine_meters(p_lat, p_lng, v_event.latitude, v_event.longitude);
 
   if v_distance > v_event.radius_meters then
@@ -269,12 +317,43 @@ begin
       round(v_distance), v_event.radius_meters;
   end if;
 
-  insert into checkins (event_id, user_id, latitude, longitude, distance_meters, hours_earned)
-  values (p_event_id, auth.uid(), p_lat, p_lng, v_distance, v_event.hours)
+  select * into v_prev
+    from checkins
+    where user_id = auth.uid() and event_id != p_event_id
+    order by checked_in_at desc
+    limit 1;
+
+  if v_prev.id is not null then
+    declare
+      v_elapsed_seconds double precision := extract(epoch from (now() - v_prev.checked_in_at));
+      v_prev_distance double precision := haversine_meters(p_lat, p_lng, v_prev.latitude, v_prev.longitude);
+    begin
+      if v_elapsed_seconds > 0 and (v_prev_distance / v_elapsed_seconds) > v_max_speed_mps then
+        v_flagged := true;
+        v_flag_reason := format(
+          'Implausible travel speed from previous check-in (~%s mph over %s min)',
+          round((v_prev_distance / v_elapsed_seconds) * 2.237),
+          round((v_elapsed_seconds / 60.0)::numeric, 1)
+        );
+      end if;
+    end;
+  end if;
+
+  insert into checkins (
+    event_id, user_id, latitude, longitude, distance_meters, accuracy_meters,
+    flagged_suspicious, flag_reason, hours_earned
+  )
+  values (
+    p_event_id, auth.uid(), p_lat, p_lng, v_distance, p_accuracy,
+    v_flagged, v_flag_reason, v_event.hours
+  )
   on conflict (event_id, user_id) do update
     set latitude = excluded.latitude,
         longitude = excluded.longitude,
         distance_meters = excluded.distance_meters,
+        accuracy_meters = excluded.accuracy_meters,
+        flagged_suspicious = excluded.flagged_suspicious,
+        flag_reason = excluded.flag_reason,
         checked_in_at = now()
   returning * into v_row;
 
@@ -282,7 +361,8 @@ begin
 end;
 $$;
 
-grant execute on function check_in(uuid, double precision, double precision) to authenticated;
+drop function if exists check_in(uuid, double precision, double precision);
+grant execute on function check_in(uuid, double precision, double precision, double precision) to authenticated;
 
 -- ============================================================
 -- messages — one shared chapter-wide chat. Reading is open to every
@@ -602,7 +682,37 @@ create policy "presence sessions are viewable by any signed-in member"
 -- as checkins/messages: the geofence check can't be bypassed by calling
 -- the table directly.
 
-create or replace function log_presence_ping(p_lat double precision, p_lng double precision)
+-- Per-event time on site, fed by every location ping (browser or the
+-- always-on tracker app, see record_presence below). minutes_on_site only
+-- grows across pings that are close together, so leaving for two hours and
+-- coming back doesn't count the gap. Philanthropy events turn this into
+-- house points: 1 point per full hour on site.
+create table if not exists event_presence (
+  event_id uuid not null references events (id) on delete cascade,
+  user_id uuid not null references profiles (id) on delete cascade,
+  first_seen_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  minutes_on_site numeric not null default 0,
+  primary key (event_id, user_id)
+);
+
+alter table event_presence enable row level security;
+
+drop policy if exists "members see their own presence, admins see all" on event_presence;
+create policy "members see their own presence, admins see all"
+  on event_presence for select to authenticated
+  using (auth.uid() = user_id or is_admin());
+
+-- Single place the house geofence and per-event time-on-site are computed,
+-- for an explicit user id: auth.uid() isn't available when the always-on
+-- tracker posts to /api/location (that route authenticates by a per-member
+-- token and calls this with the service role). Not callable by clients —
+-- log_presence_ping() below is the signed-in wrapper.
+create or replace function record_presence(
+  p_user uuid,
+  p_lat double precision,
+  p_lng double precision
+)
 returns house_presence_sessions
 language plpgsql
 security definer set search_path = public
@@ -611,18 +721,20 @@ declare
   house_lat constant double precision := 39.1639078;
   house_lng constant double precision := -86.5255585;
   house_radius constant double precision := 150;
+  -- Pings further apart than this are treated as a gap, not continuous time.
+  max_gap constant interval := interval '15 minutes';
   v_within boolean;
   v_row house_presence_sessions;
 begin
   v_within := haversine_meters(p_lat, p_lng, house_lat, house_lng) <= house_radius;
 
   select * into v_row from house_presence_sessions
-  where user_id = auth.uid() and ended_at is null;
+  where user_id = p_user and ended_at is null;
 
   if v_within then
     if v_row.id is null then
       insert into house_presence_sessions (user_id, started_at, last_ping_at, source)
-      values (auth.uid(), now(), now(), 'auto')
+      values (p_user, now(), now(), 'auto')
       returning * into v_row;
     else
       update house_presence_sessions set last_ping_at = now()
@@ -637,7 +749,32 @@ begin
     end if;
   end if;
 
+  insert into event_presence (event_id, user_id)
+  select e.id, p_user
+  from events e
+  where now() between e.starts_at and e.ends_at
+    and haversine_meters(p_lat, p_lng, e.latitude, e.longitude) <= e.radius_meters
+  on conflict (event_id, user_id) do update
+    set minutes_on_site = event_presence.minutes_on_site + case
+          when now() - event_presence.last_seen_at <= max_gap
+          then extract(epoch from (now() - event_presence.last_seen_at)) / 60.0
+          else 0 end,
+        last_seen_at = now();
+
   return v_row;
+end;
+$$;
+
+revoke execute on function record_presence(uuid, double precision, double precision) from public, anon, authenticated;
+grant execute on function record_presence(uuid, double precision, double precision) to service_role;
+
+create or replace function log_presence_ping(p_lat double precision, p_lng double precision)
+returns house_presence_sessions
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  return record_presence(auth.uid(), p_lat, p_lng);
 end;
 $$;
 
@@ -663,6 +800,228 @@ end;
 $$;
 
 grant execute on function log_presence_leave() to authenticated;
+
+-- Per-member secret for the always-on location tracker (Traccar Client /
+-- OwnTracks on the brother's phone posts to /api/location with it). Kept
+-- out of `profiles` on purpose: every profile column is readable by every
+-- member, and this token lets whoever holds it report that member's
+-- location.
+create table if not exists location_tokens (
+  user_id uuid primary key references profiles (id) on delete cascade,
+  token uuid not null unique default gen_random_uuid()
+);
+
+alter table location_tokens enable row level security;
+
+drop policy if exists "members see only their own location token" on location_tokens;
+create policy "members see only their own location token"
+  on location_tokens for select to authenticated
+  using (auth.uid() = user_id);
+
+create or replace function get_or_create_location_token()
+returns uuid
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_token uuid;
+begin
+  insert into location_tokens (user_id) values (auth.uid())
+  on conflict (user_id) do nothing;
+  select token into v_token from location_tokens where user_id = auth.uid();
+  return v_token;
+end;
+$$;
+
+-- For when a phone is lost or the token leaks: old token stops working.
+create or replace function rotate_location_token()
+returns uuid
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_token uuid := gen_random_uuid();
+begin
+  insert into location_tokens (user_id, token) values (auth.uid(), v_token)
+  on conflict (user_id) do update set token = excluded.token;
+  return v_token;
+end;
+$$;
+
+grant execute on function get_or_create_location_token() to authenticated;
+grant execute on function rotate_location_token() to authenticated;
+
+-- Calendar reminders. Each member picks which lead times they want
+-- (15 min / 1 hour / 1 day before an event) and registers their devices
+-- for web push; /api/cron/reminders sends them. reminder_log makes a send
+-- idempotent so a late or repeated cron run can't double-notify.
+create table if not exists notification_prefs (
+  user_id uuid primary key references profiles (id) on delete cascade,
+  remind_15m boolean not null default false,
+  remind_1h boolean not null default false,
+  remind_1d boolean not null default false,
+  push_subscriptions jsonb not null default '[]'::jsonb
+);
+
+alter table notification_prefs enable row level security;
+
+drop policy if exists "members manage only their own notification prefs" on notification_prefs;
+create policy "members manage only their own notification prefs"
+  on notification_prefs for all to authenticated
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create table if not exists reminder_log (
+  event_id uuid not null references events (id) on delete cascade,
+  user_id uuid not null references profiles (id) on delete cascade,
+  lead_minutes integer not null,
+  sent_at timestamptz not null default now(),
+  primary key (event_id, user_id, lead_minutes)
+);
+
+-- RLS on with no policies: only the service role (the cron route) touches it.
+alter table reminder_log enable row level security;
+
+-- ============================================================
+-- Events tab expansion: house points, reference files, RSVP, excuses,
+-- feedback survey, and check-out.
+-- ============================================================
+
+-- Distinct from `hours` (philanthropy service hours): house points are the
+-- chapter's own points system. 0 = not worth points.
+alter table events add column if not exists house_points integer not null default 0;
+
+alter table checkins add column if not exists checked_out_at timestamptz;
+alter table checkins add column if not exists checkout_latitude double precision;
+alter table checkins add column if not exists checkout_longitude double precision;
+
+-- Unlike check_in(), never rejects on distance: leaving is what's being
+-- recorded, and the stored coordinates let an admin see where they were.
+create or replace function check_out(
+  p_event_id uuid,
+  p_lat double precision,
+  p_lng double precision
+)
+returns checkins
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_row checkins;
+begin
+  update checkins
+  set checked_out_at = now(), checkout_latitude = p_lat, checkout_longitude = p_lng
+  where event_id = p_event_id and user_id = auth.uid() and checked_out_at is null
+  returning * into v_row;
+
+  if v_row.id is null then
+    raise exception 'You are not checked in to this event (or already checked out)';
+  end if;
+  return v_row;
+end;
+$$;
+
+grant execute on function check_out(uuid, double precision, double precision) to authenticated;
+
+-- Reference files/docs per event. Bytes live in the existing private
+-- "chapter-files" bucket under an events/ prefix, so its admin-only upload
+-- policy already covers them.
+create table if not exists event_files (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references events (id) on delete cascade,
+  title text not null,
+  storage_path text not null,
+  uploaded_by uuid not null references profiles (id),
+  created_at timestamptz not null default now()
+);
+
+alter table event_files enable row level security;
+
+drop policy if exists "event files are viewable by any signed-in member" on event_files;
+create policy "event files are viewable by any signed-in member"
+  on event_files for select to authenticated using (true);
+
+drop policy if exists "only admins can manage event files" on event_files;
+create policy "only admins can manage event files"
+  on event_files for all to authenticated
+  using (is_admin()) with check (is_admin());
+
+-- RSVPs: no computed business rule, so plain own-row RLS is enough here
+-- (unlike checkins). Everyone can read so the card can show head-counts.
+create table if not exists event_rsvps (
+  event_id uuid not null references events (id) on delete cascade,
+  user_id uuid not null references profiles (id) on delete cascade,
+  status text not null check (status in ('going', 'maybe', 'not_going')),
+  updated_at timestamptz not null default now(),
+  primary key (event_id, user_id)
+);
+
+alter table event_rsvps enable row level security;
+
+drop policy if exists "rsvps are viewable by any signed-in member" on event_rsvps;
+create policy "rsvps are viewable by any signed-in member"
+  on event_rsvps for select to authenticated using (true);
+
+drop policy if exists "members manage their own rsvp" on event_rsvps;
+create policy "members manage their own rsvp"
+  on event_rsvps for all to authenticated
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Excuse requests. Members may only INSERT a pending row for themselves;
+-- only admins can UPDATE (approve/deny), so a member can't approve their
+-- own excuse by writing to the table directly.
+create table if not exists event_excuses (
+  event_id uuid not null references events (id) on delete cascade,
+  user_id uuid not null references profiles (id) on delete cascade,
+  reason text not null check (char_length(trim(reason)) between 1 and 1000),
+  status text not null default 'pending' check (status in ('pending', 'approved', 'denied')),
+  created_at timestamptz not null default now(),
+  primary key (event_id, user_id)
+);
+
+alter table event_excuses enable row level security;
+
+drop policy if exists "members see their own excuses, admins see all" on event_excuses;
+create policy "members see their own excuses, admins see all"
+  on event_excuses for select to authenticated
+  using (auth.uid() = user_id or is_admin());
+
+drop policy if exists "members submit their own pending excuse" on event_excuses;
+create policy "members submit their own pending excuse"
+  on event_excuses for insert to authenticated
+  with check (auth.uid() = user_id and status = 'pending');
+
+drop policy if exists "members withdraw their own pending excuse" on event_excuses;
+create policy "members withdraw their own pending excuse"
+  on event_excuses for delete to authenticated
+  using ((auth.uid() = user_id and status = 'pending') or is_admin());
+
+drop policy if exists "only admins can review excuses" on event_excuses;
+create policy "only admins can review excuses"
+  on event_excuses for update to authenticated
+  using (is_admin()) with check (is_admin());
+
+-- Post-event feedback survey. Readable only by the author and admins so
+-- brothers can be candid.
+create table if not exists event_feedback (
+  event_id uuid not null references events (id) on delete cascade,
+  user_id uuid not null references profiles (id) on delete cascade,
+  rating integer not null check (rating between 1 and 5),
+  comments text not null default '',
+  created_at timestamptz not null default now(),
+  primary key (event_id, user_id)
+);
+
+alter table event_feedback enable row level security;
+
+drop policy if exists "members see their own feedback, admins see all" on event_feedback;
+create policy "members see their own feedback, admins see all"
+  on event_feedback for select to authenticated
+  using (auth.uid() = user_id or is_admin());
+
+drop policy if exists "members submit and edit their own feedback" on event_feedback;
+create policy "members submit and edit their own feedback"
+  on event_feedback for all to authenticated
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ============================================================
 -- Bootstrap the first admin. Run this SEPARATELY, once, after you've

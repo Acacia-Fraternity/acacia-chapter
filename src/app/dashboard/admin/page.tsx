@@ -21,9 +21,9 @@ export default async function AdminPage() {
 
   const { data: events } = await supabase
     .from("events")
-    .select("*, checkins(count)")
+    .select("*")
     .order("starts_at", { ascending: false })
-    .returns<(Event & { checkins: { count: number }[] })[]>();
+    .returns<Event[]>();
 
   const { data: members } = await supabase
     .from("profiles")
@@ -37,11 +37,17 @@ export default async function AdminPage() {
     .returns<Checkin[]>();
 
   const hoursByUserId = new Map<string, number>();
+  const checkinStatsByEventId = new Map<string, { total: number; flagged: number }>();
   for (const checkin of allCheckins ?? []) {
     hoursByUserId.set(
       checkin.user_id,
       (hoursByUserId.get(checkin.user_id) ?? 0) + Number(checkin.hours_earned),
     );
+
+    const stats = checkinStatsByEventId.get(checkin.event_id) ?? { total: 0, flagged: 0 };
+    stats.total += 1;
+    if (checkin.flagged_suspicious) stats.flagged += 1;
+    checkinStatsByEventId.set(checkin.event_id, stats);
   }
 
   return (
@@ -59,22 +65,33 @@ export default async function AdminPage() {
       <section className="space-y-3">
         <h2 className="text-sm font-medium text-muted">Events</h2>
         <ul className="space-y-2">
-          {events?.map((event) => (
-            <li
-              key={event.id}
-              className="rounded-lg border border-surface-border p-3 flex items-center justify-between"
-            >
-              <div>
-                <p className="font-medium">{event.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(event.starts_at).toLocaleString()}
-                </p>
-              </div>
-              <span className="text-sm text-muted">
-                {event.checkins?.[0]?.count ?? 0} checked in
-              </span>
-            </li>
-          ))}
+          {events?.map((event) => {
+            const stats = checkinStatsByEventId.get(event.id);
+            return (
+              <li
+                key={event.id}
+                className="rounded-lg border border-surface-border p-3 flex items-center justify-between"
+              >
+                <div>
+                  <p className="font-medium">{event.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(event.starts_at).toLocaleString()}
+                  </p>
+                </div>
+                <span className="text-sm text-muted">
+                  {stats?.total ?? 0} checked in
+                  {stats?.flagged ? (
+                    <span
+                      className="ml-1.5 text-amber-600"
+                      title="One or more check-ins were flagged for review — see checkins.flag_reason"
+                    >
+                      ⚠ {stats.flagged} flagged
+                    </span>
+                  ) : null}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       </section>
 

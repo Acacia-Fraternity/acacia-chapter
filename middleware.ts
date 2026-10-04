@@ -1,7 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/auth", "/forgot-password", "/reset-password"];
+// /api/location and /api/cron authenticate themselves (per-member token / shared
+// secret) — they are called by a phone app and a scheduler, never a browser session.
+const PUBLIC_PATHS = [
+  "/login",
+  "/auth",
+  "/forgot-password",
+  "/reset-password",
+  "/api/location",
+  "/api/cron",
+];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });

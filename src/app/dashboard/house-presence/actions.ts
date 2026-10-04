@@ -3,6 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
+export async function rotateLocationToken() {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("rotate_location_token");
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/house-presence");
+}
+
 export async function setLivesInHouse(userId: string, livesInHouse: boolean) {
   const supabase = await createClient();
   const { error } = await supabase

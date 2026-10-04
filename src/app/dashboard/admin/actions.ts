@@ -14,7 +14,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
  */
 async function updateProfileField(
   userId: string,
-  field: "role" | "can_chat" | "can_react",
+  field: "role" | "can_chat" | "can_react" | "is_pledge",
   value: string | boolean,
 ) {
   const supabase = await createClient();
@@ -38,6 +38,10 @@ export async function setMemberCanChat(userId: string, canChat: boolean) {
 
 export async function setMemberCanReact(userId: string, canReact: boolean) {
   await updateProfileField(userId, "can_react", canReact);
+}
+
+export async function setMemberIsPledge(userId: string, isPledge: boolean) {
+  await updateProfileField(userId, "is_pledge", isPledge);
 }
 
 /**

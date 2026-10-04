@@ -1,7 +1,18 @@
+import Link from "next/link";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { LivesInHouseToggle } from "@/components/lives-in-house-toggle";
 import { PresenceToggle } from "@/components/presence-toggle";
+import { rotateLocationToken } from "./actions";
 import type { Profile, HousePresenceSession } from "@/lib/types";
+
+type Filter = "all" | "away" | "pledges";
+
+const FILTERS: { value: Filter; label: string }[] = [
+  { value: "all", label: "Everyone" },
+  { value: "away", label: "Not at the house" },
+  { value: "pledges", label: "Pledges" },
+];
 
 function startOfWeek(): Date {
   const now = new Date();
@@ -12,13 +23,36 @@ function startOfWeek(): Date {
   return start;
 }
 
-export default async function HousePresencePage() {
+function timeAgo(iso: string, now: number): string {
+  const minutes = Math.round((now - new Date(iso).getTime()) / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+export default async function HousePresencePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>;
+}) {
+  const { filter: filterParam } = await searchParams;
+  const filter: Filter =
+    filterParam === "away" || filterParam === "pledges" ? filterParam : "all";
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: members }, { data: sessions }] = await Promise.all([
+  const [
+    { data: profile },
+    { data: members },
+    { data: sessions },
+    { data: lastSessions },
+    { data: token },
+  ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single<Profile>(),
     supabase.from("profiles").select("*").order("full_name").returns<Profile[]>(),
     supabase
@@ -26,6 +60,14 @@ export default async function HousePresencePage() {
       .select("*")
       .gte("started_at", startOfWeek().toISOString())
       .returns<HousePresenceSession[]>(),
+    // Most recent session per member, regardless of week, for "last seen".
+    supabase
+      .from("house_presence_sessions")
+      .select("*")
+      .order("last_ping_at", { ascending: false })
+      .limit(500)
+      .returns<HousePresenceSession[]>(),
+    supabase.rpc("get_or_create_location_token"),
   ]);
 
   const isAdmin = profile?.role === "admin";
@@ -39,26 +81,70 @@ export default async function HousePresencePage() {
     const end = session.ended_at ? new Date(session.ended_at).getTime() : now;
     const hours = Math.max(0, (end - start) / (1000 * 60 * 60));
     hoursByUserId.set(session.user_id, (hoursByUserId.get(session.user_id) ?? 0) + hours);
-
-    if (!session.ended_at) currentlyHomeSet.add(session.user_id);
   }
+
+  const lastSeenByUserId = new Map<string, string>();
+  for (const session of lastSessions ?? []) {
+    if (!session.ended_at) currentlyHomeSet.add(session.user_id);
+    if (!lastSeenByUserId.has(session.user_id)) {
+      lastSeenByUserId.set(session.user_id, session.ended_at ?? session.last_ping_at);
+    }
+  }
+
+  const visibleMembers = (members ?? []).filter((m) => {
+    if (filter === "away") return !currentlyHomeSet.has(m.id);
+    if (filter === "pledges") return m.is_pledge;
+    return true;
+  });
+  const homeCount = (members ?? []).filter((m) => currentlyHomeSet.has(m.id)).length;
+
+  const host = (await headers()).get("host") ?? "your-app-domain";
+  const protocol = host.startsWith("localhost") ? "http" : "https";
+  const endpoint = `${protocol}://${host}/api/location`;
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-lg font-semibold">House Presence</h1>
         <p className="text-sm text-muted-foreground">
-          Hours are approximate — only counted while the app is open near the
-          house (phones don&apos;t allow background location for websites).
-          Use &quot;I&apos;m home&quot;/&quot;I&apos;m leaving&quot; to cover the gaps.
+          {homeCount} of {members?.length ?? 0} at the house right now. Brothers
+          who set up always-on tracking below are tracked continuously;
+          everyone else is only counted while the app is open near the house
+          (use &quot;I&apos;m home&quot;/&quot;I&apos;m leaving&quot; to cover
+          the gaps).
         </p>
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        {FILTERS.map((f) => (
+          <Link
+            key={f.value}
+            href={
+              f.value === "all"
+                ? "/dashboard/house-presence"
+                : `/dashboard/house-presence?filter=${f.value}`
+            }
+            className={`rounded-full border px-3 py-1 text-xs font-medium ${
+              filter === f.value
+                ? "border-acacia-gold bg-acacia-gold/25"
+                : "border-surface-border"
+            }`}
+          >
+            {f.label}
+          </Link>
+        ))}
+      </div>
+
+      {visibleMembers.length === 0 && (
+        <p className="text-sm text-muted-foreground">Nobody matches this filter.</p>
+      )}
+
       <ul className="space-y-2">
-        {members?.map((member) => {
+        {visibleMembers.map((member) => {
           const isSelf = member.id === user!.id;
           const isHome = currentlyHomeSet.has(member.id);
           const hours = hoursByUserId.get(member.id) ?? 0;
+          const lastSeen = lastSeenByUserId.get(member.id);
 
           return (
             <li
@@ -66,16 +152,26 @@ export default async function HousePresencePage() {
               className="rounded-lg border border-surface-border p-3 flex items-center justify-between gap-3 flex-wrap"
             >
               <div className="flex items-center gap-2 min-w-0">
-                {isHome && (
-                  <span
-                    className="h-2 w-2 rounded-full bg-acacia-green shrink-0"
-                    title="Currently home"
-                  />
-                )}
+                <span
+                  className={`h-2 w-2 rounded-full shrink-0 ${
+                    isHome ? "bg-acacia-green" : "bg-surface-border"
+                  }`}
+                  title={isHome ? "Currently home" : "Not at the house"}
+                />
                 <span className="text-sm font-medium truncate">
                   {member.full_name || "(no name set)"}
                   {isSelf && <span className="text-muted-foreground"> (you)</span>}
                 </span>
+                {member.is_pledge && (
+                  <span className="rounded-full bg-acacia-gold/25 px-2 py-0.5 text-xs font-medium">
+                    Pledge
+                  </span>
+                )}
+                {!isHome && lastSeen && (
+                  <span className="text-xs text-muted-foreground">
+                    last at house {timeAgo(lastSeen, now)}
+                  </span>
+                )}
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
@@ -93,6 +189,50 @@ export default async function HousePresencePage() {
           );
         })}
       </ul>
+
+      <details className="rounded-lg border border-surface-border p-3 text-sm">
+        <summary className="cursor-pointer font-medium">
+          Set up always-on tracking on your phone
+        </summary>
+        <div className="mt-3 space-y-3 text-muted">
+          <p>
+            Websites can&apos;t see your location once the app is closed, so
+            this uses a free tracker app that can. It reports your position to
+            the chapter&apos;s server in the background; the server only records
+            when you enter or leave the house or an event.
+          </p>
+          <ol className="list-decimal pl-5 space-y-1">
+            <li>
+              Install <span className="font-medium">Traccar Client</span> (free,
+              iPhone and Android).
+            </li>
+            <li>
+              Set <span className="font-medium">Device identifier</span> to your
+              personal code below.
+            </li>
+            <li>
+              Set <span className="font-medium">Server URL</span> to{" "}
+              <code className="break-all">{endpoint}</code>
+            </li>
+            <li>Set frequency to 60 seconds and turn the service on.</li>
+            <li>
+              When asked, allow location <span className="font-medium">Always</span>{" "}
+              (on iPhone also leave Precise Location on).
+            </li>
+          </ol>
+          <div>
+            <p className="text-xs">Your personal code (treat it like a password):</p>
+            <code className="block break-all rounded-md bg-surface-border px-2 py-1 text-xs">
+              {typeof token === "string" ? token : "unavailable"}
+            </code>
+          </div>
+          <form action={rotateLocationToken}>
+            <button className="text-xs underline text-muted-foreground">
+              Reset my code (lost phone or leaked it)
+            </button>
+          </form>
+        </div>
+      </details>
     </div>
   );
 }

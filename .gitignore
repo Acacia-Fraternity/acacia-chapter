@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Supabase public root CA, needed by scripts/db-push.mjs (not a secret)
+!scripts/supabase-root-ca.pem
