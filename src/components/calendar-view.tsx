@@ -249,7 +249,7 @@ export function CalendarView({
   const gridCols = view === "day" ? "3.5rem 1fr" : "3.5rem repeat(7, minmax(0, 1fr))";
 
   return (
-    <div className="space-y-4">
+    <div data-wide className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold">Calendar</h1>
         <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -310,7 +310,7 @@ export function CalendarView({
         <div className="rounded-lg border border-surface-border overflow-x-auto">
           <div
             ref={scrollRef}
-            className="max-h-[calc(100vh-16rem)] min-h-[24rem] overflow-y-auto"
+            className="h-[calc(100vh-12rem)] min-h-[24rem] overflow-y-auto"
             style={{ minWidth: view === "week" ? 720 : undefined }}
           >
             <div className="sticky top-0 z-20 bg-background border-b border-surface-border">

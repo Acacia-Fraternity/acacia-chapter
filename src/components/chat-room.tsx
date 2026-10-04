@@ -8,6 +8,8 @@ interface ChatMessage {
   user_id: string;
   content: string;
   created_at: string;
+  file_path: string | null;
+  file_name: string | null;
   pending?: boolean;
 }
 
@@ -19,18 +21,27 @@ interface ChatReaction {
 }
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "🎉", "👀"];
+const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
 export function ChatRoom({
+  channel,
   currentUserId,
-  canChat,
+  isAdmin,
+  canPost,
+  postBlockedReason,
   canReact,
+  audienceCount,
   profiles,
   initialMessages,
   initialReactions,
 }: {
+  channel: "active" | "exec" | "pledge";
   currentUserId: string;
-  canChat: boolean;
+  isAdmin: boolean;
+  canPost: boolean;
+  postBlockedReason: string;
   canReact: boolean;
+  audienceCount: number;
   profiles: { id: string; full_name: string }[];
   initialMessages: ChatMessage[];
   initialReactions: ChatReaction[];
@@ -39,8 +50,11 @@ export function ChatRoom({
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [reactions, setReactions] = useState<ChatReaction[]>(initialReactions);
   const [draft, setDraft] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const nameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -49,11 +63,11 @@ export function ChatRoom({
   }, [profiles]);
 
   useEffect(() => {
-    const channel = supabase
-      .channel("chat-room")
+    const realtimeChannel = supabase
+      .channel(`chat-room-${channel}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages" },
+        { event: "INSERT", schema: "public", table: "messages", filter: `channel=eq.${channel}` },
         (payload) => {
           const row = payload.new as ChatMessage;
           setMessages((prev) => {
@@ -87,9 +101,9 @@ export function ChatRoom({
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(realtimeChannel);
     };
-  }, [supabase]);
+  }, [supabase, channel]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -98,10 +112,34 @@ export function ChatRoom({
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     const content = draft.trim();
-    if (!content) return;
+    if ((!content && !file) || sending) return;
 
     setError(null);
+    setSending(true);
+
+    let filePath: string | null = null;
+    if (file) {
+      if (file.size > MAX_FILE_BYTES) {
+        setError("That file is over 20 MB.");
+        setSending(false);
+        return;
+      }
+      const safeName = file.name.replace(/[^\w.-]+/g, "_");
+      filePath = `${currentUserId}/${Date.now()}-${safeName}`;
+      const { error: uploadError } = await supabase.storage
+        .from("chat-files")
+        .upload(filePath, file, { contentType: file.type || "application/octet-stream" });
+      if (uploadError) {
+        setError(uploadError.message);
+        setSending(false);
+        return;
+      }
+    }
+
+    const attached = file;
     setDraft("");
+    setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
 
     const tempId = `temp-${Date.now()}`;
     setMessages((prev) => [
@@ -111,15 +149,34 @@ export function ChatRoom({
         user_id: currentUserId,
         content,
         created_at: new Date().toISOString(),
+        file_path: filePath,
+        file_name: attached?.name ?? null,
         pending: true,
       },
     ]);
 
-    const { error } = await supabase.rpc("send_message", { p_content: content });
+    const { error } = await supabase.rpc("send_message", {
+      p_content: content,
+      p_channel: channel,
+      p_file_path: filePath,
+      p_file_name: attached?.name ?? null,
+    });
+    setSending(false);
     if (error) {
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
       setError(error.message);
     }
+  }
+
+  async function openFile(path: string) {
+    const { data, error } = await supabase.storage
+      .from("chat-files")
+      .createSignedUrl(path, 300);
+    if (error || !data) {
+      setError(error?.message ?? "Couldn't open that file");
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener");
   }
 
   async function handleReact(messageId: string, emoji: string) {
@@ -132,21 +189,35 @@ export function ChatRoom({
 
   function reactionSummary(messageId: string) {
     const forMessage = reactions.filter((r) => r.message_id === messageId);
-    const byEmoji = new Map<string, { count: number; reactedByMe: boolean }>();
+    const byEmoji = new Map<
+      string,
+      { count: number; reactedByMe: boolean; names: string[] }
+    >();
     for (const r of forMessage) {
-      const entry = byEmoji.get(r.emoji) ?? { count: 0, reactedByMe: false };
+      const entry = byEmoji.get(r.emoji) ?? { count: 0, reactedByMe: false, names: [] };
       entry.count += 1;
+      entry.names.push(nameById.get(r.user_id) ?? "Unknown");
       if (r.user_id === currentUserId) entry.reactedByMe = true;
       byEmoji.set(r.emoji, entry);
     }
     return Array.from(byEmoji.entries());
   }
 
-  return (
-    <div className="flex flex-col h-[calc(100vh-6rem)]">
-      <h1 className="text-lg font-semibold mb-3">Chat</h1>
+  function reactedCount(messageId: string) {
+    return new Set(
+      reactions.filter((r) => r.message_id === messageId).map((r) => r.user_id),
+    ).size;
+  }
 
+  return (
+    <>
       <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+        {messages.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            {channel === "exec" ? "No announcements yet." : "No messages yet."}
+          </p>
+        )}
+
         {messages.map((message) => {
           const isMe = message.user_id === currentUserId;
           const summary = reactionSummary(message.id);
@@ -165,15 +236,29 @@ export function ChatRoom({
                     {nameById.get(message.user_id) ?? "Unknown"}
                   </p>
                 )}
-                <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                {message.content && (
+                  <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                )}
+                {message.file_path && (
+                  <button
+                    onClick={() => openFile(message.file_path!)}
+                    className="mt-1 flex items-center gap-1.5 rounded-md border border-current/30 px-2 py-1 text-xs underline-offset-2 hover:underline"
+                  >
+                    <span aria-hidden>📎</span>
+                    <span className="truncate max-w-56">
+                      {message.file_name ?? "Attachment"}
+                    </span>
+                  </button>
+                )}
               </div>
 
               <div className="flex items-center gap-1 mt-1 flex-wrap">
-                {summary.map(([emoji, { count, reactedByMe }]) => (
+                {summary.map(([emoji, { count, reactedByMe, names }]) => (
                   <button
                     key={emoji}
                     onClick={() => handleReact(message.id, emoji)}
                     disabled={!canReact}
+                    title={names.join(", ")}
                     className={`text-xs rounded-full border px-1.5 py-0.5 ${
                       reactedByMe
                         ? "border-acacia-gold bg-acacia-gold/20"
@@ -202,6 +287,12 @@ export function ChatRoom({
                     </div>
                   </div>
                 )}
+
+                {channel === "exec" && isAdmin && (
+                  <span className="text-xs text-muted-foreground ml-1">
+                    {reactedCount(message.id)} of {audienceCount} reacted
+                  </span>
+                )}
               </div>
             </div>
           );
@@ -211,27 +302,62 @@ export function ChatRoom({
 
       {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
 
-      {canChat ? (
-        <form onSubmit={handleSend} className="mt-3 flex gap-2">
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Message the chapter…"
-            className="flex-1 rounded-md border border-surface-border px-3 py-2 text-sm"
-          />
+      {canPost ? (
+        <form onSubmit={handleSend} className="mt-3 flex gap-2 items-center">
+          <label
+            className="cursor-pointer rounded-md border border-surface-border px-2.5 py-2 text-sm"
+            title="Attach a document"
+          >
+            📎
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+          </label>
+          <div className="flex-1 min-w-0">
+            {file && (
+              <p className="text-xs text-muted truncate mb-1">
+                Attached: {file.name}{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFile(null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                  className="underline"
+                >
+                  remove
+                </button>
+              </p>
+            )}
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={
+                channel === "exec"
+                  ? "Post an announcement…"
+                  : channel === "pledge"
+                    ? "Message the pledges…"
+                    : "Message the chapter…"
+              }
+              className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
+            />
+          </div>
           <button
             type="submit"
-            className="rounded-md bg-acacia-gold text-acacia-black px-4 py-2 text-sm font-semibold"
+            disabled={sending}
+            className="rounded-md bg-acacia-gold text-acacia-black px-4 py-2 text-sm font-semibold disabled:opacity-50"
           >
-            Send
+            {sending ? "Sending…" : "Send"}
           </button>
         </form>
       ) : (
         <p className="mt-3 text-sm text-muted-foreground border border-surface-border rounded-md px-3 py-2">
-          You don&apos;t currently have permission to send messages. Ask an admin
-          if you think this is wrong.
+          {postBlockedReason}
         </p>
       )}
-    </div>
+    </>
   );
 }

@@ -378,13 +378,47 @@ create table if not exists messages (
   created_at timestamptz not null default now()
 );
 
+-- Three rooms share this table, split by `channel`:
+--   active — every non-pledge brother talks
+--   exec   — announcements: only admins post, brothers read and react (the
+--            reactions are how the exec sees how an announcement landed)
+--   pledge — pledges (and admins) only
+-- `create table if not exists` is a no-op on the live table, so the new
+-- columns need explicit ALTERs.
+alter table messages add column if not exists channel text not null default 'active';
+alter table messages drop constraint if exists messages_channel_check;
+alter table messages add constraint messages_channel_check
+  check (channel in ('active', 'exec', 'pledge'));
+alter table messages add column if not exists file_path text;
+alter table messages add column if not exists file_name text;
+-- Original check required 1+ chars; a message that is only an attachment
+-- has no text.
+alter table messages drop constraint if exists messages_content_check;
+alter table messages add constraint messages_content_check
+  check (char_length(trim(content)) <= 2000 and (char_length(trim(content)) >= 1 or file_path is not null));
+
 alter table messages enable row level security;
 
+-- Who may READ a channel. Posting rules are separate (send_message below).
+create or replace function can_read_channel(p_channel text)
+returns boolean
+language sql
+security definer set search_path = public
+stable
+as $$
+  select case
+    when is_admin() then true
+    when p_channel = 'pledge' then coalesce((select is_pledge from profiles where id = auth.uid()), false)
+    else not coalesce((select is_pledge from profiles where id = auth.uid()), true)
+  end;
+$$;
+
 drop policy if exists "messages are viewable by any signed-in member" on messages;
-create policy "messages are viewable by any signed-in member"
+drop policy if exists "messages are viewable by members of their channel" on messages;
+create policy "messages are viewable by members of their channel"
   on messages for select
   to authenticated
-  using (true);
+  using (can_read_channel(channel));
 
 drop policy if exists "members can delete their own messages, admins any" on messages;
 create policy "members can delete their own messages, admins any"
@@ -392,7 +426,14 @@ create policy "members can delete their own messages, admins any"
   to authenticated
   using (auth.uid() = user_id or is_admin());
 
-create or replace function send_message(p_content text)
+drop function if exists send_message(text);
+
+create or replace function send_message(
+  p_content text,
+  p_channel text default 'active',
+  p_file_path text default null,
+  p_file_name text default null
+)
 returns messages
 language plpgsql
 security definer set search_path = public
@@ -404,15 +445,52 @@ begin
     raise exception 'You do not have permission to send messages';
   end if;
 
-  insert into messages (user_id, content)
-  values (auth.uid(), trim(p_content))
+  if not can_read_channel(p_channel) then
+    raise exception 'You are not in this chat';
+  end if;
+
+  if p_channel = 'exec' and not is_admin() then
+    raise exception 'Only the exec can post announcements';
+  end if;
+
+  -- Attachments are uploaded by the browser straight to Storage under the
+  -- sender's own folder; refuse a path pointing at someone else's file.
+  if p_file_path is not null and split_part(p_file_path, '/', 1) <> auth.uid()::text then
+    raise exception 'Invalid attachment';
+  end if;
+
+  insert into messages (user_id, content, channel, file_path, file_name)
+  values (auth.uid(), trim(coalesce(p_content, '')), p_channel, p_file_path, p_file_name)
   returning * into v_row;
 
   return v_row;
 end;
 $$;
 
-grant execute on function send_message(text) to authenticated;
+grant execute on function send_message(text, text, text, text) to authenticated;
+
+-- Chat attachments: private bucket, files live under <uploader id>/. A file
+-- is readable only if a message the reader can see points at it (messages
+-- RLS applies inside the subquery), so a pledge-chat document can't be
+-- opened by someone outside that chat.
+insert into storage.buckets (id, name, public)
+values ('chat-files', 'chat-files', false)
+on conflict (id) do nothing;
+
+drop policy if exists "chat-files: members upload to their own folder" on storage.objects;
+create policy "chat-files: members upload to their own folder"
+  on storage.objects for insert
+  to authenticated
+  with check (bucket_id = 'chat-files' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "chat-files: read files attached to visible messages" on storage.objects;
+create policy "chat-files: read files attached to visible messages"
+  on storage.objects for select
+  to authenticated
+  using (
+    bucket_id = 'chat-files'
+    and exists (select 1 from public.messages m where m.file_path = storage.objects.name)
+  );
 
 -- ============================================================
 -- message_reactions — emoji reactions on a message. Same pattern as
@@ -431,10 +509,11 @@ create table if not exists message_reactions (
 alter table message_reactions enable row level security;
 
 drop policy if exists "reactions are viewable by any signed-in member" on message_reactions;
-create policy "reactions are viewable by any signed-in member"
+drop policy if exists "reactions are viewable if the message is" on message_reactions;
+create policy "reactions are viewable if the message is"
   on message_reactions for select
   to authenticated
-  using (true);
+  using (exists (select 1 from messages m where m.id = message_id));
 
 -- Toggles: adds the reaction if it's not there yet, removes it if it is.
 -- Returns true if a reaction now exists, false if one was just removed.
@@ -448,6 +527,13 @@ declare
 begin
   if not can_react() then
     raise exception 'You do not have permission to react to messages';
+  end if;
+
+  -- security definer skips RLS, so re-check the caller can see the message.
+  if not exists (
+    select 1 from messages m where m.id = p_message_id and can_read_channel(m.channel)
+  ) then
+    raise exception 'Message not found';
   end if;
 
   select id into v_existing
@@ -500,13 +586,22 @@ create table if not exists chapter_notes (
   updated_at timestamptz not null default now()
 );
 
+-- `category` splits the full chapter's notes from exec-only ones (admins
+-- only); `folder` is free-text grouping (Rush, Finance, Philanthropy...).
+alter table chapter_notes add column if not exists category text not null default 'chapter';
+alter table chapter_notes drop constraint if exists chapter_notes_category_check;
+alter table chapter_notes add constraint chapter_notes_category_check
+  check (category in ('chapter', 'exec'));
+alter table chapter_notes add column if not exists folder text not null default '';
+
 alter table chapter_notes enable row level security;
 
 drop policy if exists "chapter notes are viewable by any signed-in member" on chapter_notes;
-create policy "chapter notes are viewable by any signed-in member"
+drop policy if exists "chapter notes visible; exec notes only to admins" on chapter_notes;
+create policy "chapter notes visible; exec notes only to admins"
   on chapter_notes for select
   to authenticated
-  using (true);
+  using (category <> 'exec' or is_admin());
 
 drop policy if exists "only admins can write chapter notes" on chapter_notes;
 create policy "only admins can write chapter notes"
@@ -528,13 +623,24 @@ create table if not exists chapter_files (
   created_at timestamptz not null default now()
 );
 
+alter table chapter_files add column if not exists category text not null default 'chapter';
+alter table chapter_files drop constraint if exists chapter_files_category_check;
+alter table chapter_files add constraint chapter_files_category_check
+  check (category in ('chapter', 'exec'));
+alter table chapter_files add column if not exists folder text not null default '';
+-- A Google Drive (or any) link instead of an uploaded file; storage_path is
+-- then ''. Real two-way Drive sync needs a Google Cloud OAuth app, which
+-- this project doesn't have - links are the stand-in.
+alter table chapter_files add column if not exists external_url text;
+
 alter table chapter_files enable row level security;
 
 drop policy if exists "chapter files are viewable by any signed-in member" on chapter_files;
-create policy "chapter files are viewable by any signed-in member"
+drop policy if exists "chapter files visible; exec files only to admins" on chapter_files;
+create policy "chapter files visible; exec files only to admins"
   on chapter_files for select
   to authenticated
-  using (true);
+  using (category <> 'exec' or is_admin());
 
 drop policy if exists "only admins can manage chapter files" on chapter_files;
 create policy "only admins can manage chapter files"

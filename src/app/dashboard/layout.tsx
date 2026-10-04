@@ -30,7 +30,8 @@ export default async function DashboardLayout({
         isAdmin={profile?.role === "admin"}
       />
       <main className="flex-1 min-w-0 px-4 sm:px-8 py-6">
-        <div className="max-w-4xl mx-auto">{children}</div>
+        {/* A page can opt out of the reading-width cap by rendering a data-wide element (the calendar does). */}
+        <div className="max-w-4xl mx-auto has-[[data-wide]]:max-w-none">{children}</div>
       </main>
     </div>
   );

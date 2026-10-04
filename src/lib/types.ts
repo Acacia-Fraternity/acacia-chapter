@@ -47,6 +47,8 @@ export interface ChapterNote {
   id: string;
   title: string;
   content: string;
+  category: "chapter" | "exec";
+  folder: string;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -56,6 +58,9 @@ export interface ChapterFile {
   id: string;
   title: string;
   storage_path: string;
+  external_url: string | null;
+  category: "chapter" | "exec";
+  folder: string;
   uploaded_by: string;
   created_at: string;
 }

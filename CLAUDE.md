@@ -347,6 +347,22 @@ What's actually built, given that ceiling:
   (>= 24h, e.g. pledge period) as bars in an all-day strip.
 - `profiles.is_pledge` is admin-only (guarded in the privilege trigger).
 
+## Chat channels, attachments, chapter folders
+
+- `messages.channel`: `active` (non-pledges), `exec` (announcements: only
+  admins post, everyone else reads + reacts; admins see "N of M reacted"),
+  `pledge` (pledges + admins). Read access is `can_read_channel()` in RLS
+  (reactions inherit it via the message); posting rules live in
+  `send_message()`. Realtime respects RLS. The web can't block screenshots —
+  "pledge chats (no ss)" is not enforceable here.
+- Chat documents: private `chat-files` bucket, uploaded by the browser under
+  `<uid>/`; a file is readable only if a visible message points at it.
+- `chapter_notes`/`chapter_files` have `category` (`chapter` | `exec`, exec is
+  admin-only via RLS) and free-text `folder`. Google Drive "sync" is just
+  stored links (`external_url`); real sync needs a Google Cloud OAuth app.
+- Pages can go full-width by rendering a `data-wide` element (see
+  `dashboard/layout.tsx`); the calendar does.
+
 ## No public sign-up (admin-created accounts)
 
 There is no sign-up form. `/login` is sign-in only. Accounts are created
