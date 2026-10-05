@@ -521,12 +521,11 @@ three different free-tier ownership models:
 - **Dues**: `dues_charges` (admin-managed, members read their own). Payment is
   recorded by hand. `/api/cron/reminders` pushes at 7 days / 1 day / due date /
   weekly while overdue (9am-8pm chapter time only), deduped by `dues_reminder_log`.
-- **Canvas grades**: pledges paste a personal Canvas access token on the Grades
-  page; stored in `canvas_connections` (service role only), copied to
-  `canvas_grades` (visible to the pledge + committee/admins). Host is fixed to
-  `CANVAS_BASE_URL` (default iu.instructure.com) so tokens can't be sent elsewhere.
-  The reminders cron refreshes stale connections. Works only if IU lets students
-  create access tokens.
+- **Grades** (`course_grades`): pledges type in their own course percentages (a Canvas
+  token integration was built then removed — IU stopped user-level Canvas API
+  tokens in Aug 2026; UITS has a Qualtrics survey for Canvas API use cases if an
+  official route ever appears). Pledge manages own rows; committee/admins read
+  pledges' rows (RLS). Rows untouched for 8+ days are flagged stale.
 - **Pledgeship** (`/dashboard/pledgeship`, was Curriculum): Schedule subtab renders
   `src/lib/pledgeship.ts` (transcribed from the Fall 2026 schedule .docx); Quizzes
   subtab is the old curriculum quiz. `/dashboard/curriculum` redirects.

@@ -4,7 +4,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CHAPTER_TZ } from "@/lib/chapter-time";
 import { chapterToday, daysUntil, formatMoney } from "@/lib/dues";
-import { recordCanvasError, syncCanvasGrades } from "@/lib/canvas";
 
 // Called every ~5 minutes by .github/workflows/reminders.yml. Sends a push
 // for each (member, event, lead time) that is due and hasn't been sent.
@@ -120,29 +119,6 @@ async function sendDuesReminders(admin: SupabaseClient, prefs: Prefs[]): Promise
   return sent;
 }
 
-// Keeps pledges' Canvas grades reasonably fresh without hammering Canvas:
-// a few connections per run, only those not synced in the last 6 hours.
-async function refreshStaleCanvas(admin: SupabaseClient): Promise<void> {
-  const cutoff = new Date(Date.now() - 6 * 3600_000).toISOString();
-  const { data } = await admin
-    .from("canvas_connections")
-    .select("user_id, access_token")
-    .or(`last_synced_at.is.null,last_synced_at.lt.${cutoff}`)
-    .limit(5);
-  for (const c of data ?? []) {
-    try {
-      await syncCanvasGrades(admin, c.user_id, c.access_token);
-    } catch (err) {
-      await recordCanvasError(admin, c.user_id, err instanceof Error ? err.message : "Sync failed");
-      // Push last_synced_at forward so a dead token isn't retried every run.
-      await admin
-        .from("canvas_connections")
-        .update({ last_synced_at: new Date().toISOString() })
-        .eq("user_id", c.user_id);
-    }
-  }
-}
-
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
@@ -173,7 +149,6 @@ export async function GET(request: NextRequest) {
 
   let sent = 0;
   if (prefs.length > 0) sent += await sendDuesReminders(admin, prefs);
-  await refreshStaleCanvas(admin);
   if (!events?.length || prefs.length === 0) return NextResponse.json({ sent });
 
   const eventIds = events.map((e) => e.id);

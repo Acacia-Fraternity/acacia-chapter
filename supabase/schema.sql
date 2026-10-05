@@ -36,7 +36,7 @@ alter table profiles add column if not exists can_edit_calendar boolean not null
 -- Third member status next to pledge / active: Exec officers. `role = 'admin'`
 -- still counts as exec everywhere (see is_exec()). Admin-controlled.
 alter table profiles add column if not exists is_exec boolean not null default false;
--- Runs the pledge program: reads the pledge chat and sees pledge Canvas
+-- Runs the pledge program: reads the pledge chat and sees pledge course
 -- grades. Admin-controlled.
 alter table profiles add column if not exists on_pledge_committee boolean not null default false;
 
@@ -1460,43 +1460,40 @@ create table if not exists dues_reminder_log (
 alter table dues_reminder_log enable row level security;
 
 -- ============================================================
--- Canvas — a pledge connects their own Canvas by pasting a personal access
--- token (Canvas > Account > Settings > New Access Token). The token is only
--- ever read/written with the service role (RLS on, no policies, same idea as
--- location_tokens); grades are copied into canvas_grades, which the pledge
--- and the pledge committee/admins can read.
+-- Course grades — self-reported by pledges. (A Canvas token integration was
+-- built first, but IU stopped offering user-level Canvas API tokens in Aug
+-- 2026, so grades are typed in instead.) A pledge manages only their own
+-- rows; the pledge committee and admins can read pledges' rows.
 -- ============================================================
-create table if not exists canvas_connections (
-  user_id uuid primary key references profiles (id) on delete cascade,
-  access_token text not null,
-  connected_at timestamptz not null default now(),
-  last_synced_at timestamptz,
-  last_error text
-);
-alter table canvas_connections enable row level security;
+drop table if exists canvas_grades;
+drop table if exists canvas_connections;
 
-create table if not exists canvas_grades (
+create table if not exists course_grades (
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references profiles (id) on delete cascade,
-  course_id bigint not null,
-  course_name text not null,
-  current_score numeric,
-  current_grade text,
-  synced_at timestamptz not null default now(),
-  primary key (user_id, course_id)
+  course_name text not null check (char_length(trim(course_name)) between 1 and 80),
+  score numeric(5, 2) not null check (score >= 0 and score <= 150),
+  updated_at timestamptz not null default now(),
+  unique (user_id, course_name)
 );
 
-alter table canvas_grades enable row level security;
+alter table course_grades enable row level security;
 
-drop policy if exists "pledges see own grades, committee sees pledge grades" on canvas_grades;
-create policy "pledges see own grades, committee sees pledge grades"
-  on canvas_grades for select to authenticated
+drop policy if exists "own grades, or pledge grades for the committee" on course_grades;
+create policy "own grades, or pledge grades for the committee"
+  on course_grades for select to authenticated
   using (
     user_id = auth.uid()
     or (
       on_pledge_committee()
-      and exists (select 1 from profiles p where p.id = canvas_grades.user_id and p.is_pledge)
+      and exists (select 1 from profiles p where p.id = course_grades.user_id and p.is_pledge)
     )
   );
+
+drop policy if exists "members manage their own grades" on course_grades;
+create policy "members manage their own grades"
+  on course_grades for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- ============================================================
 -- Polls — created by exec/admins. A poll marked `required` blocks the rest of

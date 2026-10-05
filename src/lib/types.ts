@@ -175,13 +175,12 @@ export interface DuesCharge {
   created_at: string;
 }
 
-export interface CanvasGrade {
+export interface CourseGrade {
+  id: string;
   user_id: string;
-  course_id: number;
   course_name: string;
-  current_score: number | null;
-  current_grade: string | null;
-  synced_at: string;
+  score: number;
+  updated_at: string;
 }
 
 export interface Poll {
