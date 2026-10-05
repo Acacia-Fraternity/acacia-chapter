@@ -6,8 +6,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // schema.sql), so the only way to get true 24/7 presence without building a
 // native app is an existing one that already holds "Always Allow" location
 // and can POST to a URL. Two are supported:
-//   - Traccar Client (free, iOS/Android): sends id/lat/lon/accuracy/timestamp
-//     as query params or form data; its "device identifier" is the token.
+//   - Traccar Client (free, iOS/Android): its "device identifier" is the
+//     token. Newer versions post JSON, older ones send query/form params.
 //   - OwnTracks (free, iOS/Android): HTTP mode posts JSON
 //     {_type:"location", lat, lon, acc, tst}; put ?token=... on its URL.
 // The token is a bearer secret tied to one member (location_tokens), so
@@ -25,6 +25,14 @@ interface Fix {
   lng: number;
   accuracy: number | null;
   timestampSeconds: number | null;
+}
+
+// Number(null) is 0, which would turn a missing coordinate into a valid
+// "0,0" fix — so absent values must stay absent.
+function num(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
 async function readFix(request: NextRequest): Promise<Fix | null> {
@@ -45,24 +53,35 @@ async function readFix(request: NextRequest): Promise<Fix | null> {
     }
   }
 
-  const lat = Number(json.lat ?? params.get("lat"));
-  const lng = Number(json.lon ?? params.get("lon"));
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  // The current Traccar Client app posts JSON shaped like
+  // {device_id, location: {timestamp: ISO string, coords: {latitude,
+  // longitude, accuracy}}}; older versions and OwnTracks use flat fields.
+  const location = (json.location ?? {}) as Record<string, unknown>;
+  const coords = (location.coords ?? {}) as Record<string, unknown>;
+
+  const lat = num(json.lat ?? coords.latitude ?? params.get("lat"));
+  const lng = num(json.lon ?? coords.longitude ?? params.get("lon"));
+  if (lat === null || lng === null) return null;
   if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
 
-  const accRaw = json.acc ?? params.get("accuracy");
-  const tsRaw = json.tst ?? params.get("timestamp");
-  const accuracy = accRaw == null ? null : Number(accRaw);
-  let timestampSeconds = tsRaw == null ? null : Number(tsRaw);
+  const accuracy = num(json.acc ?? coords.accuracy ?? params.get("accuracy"));
+
+  let timestampSeconds = num(json.tst ?? params.get("timestamp"));
+  if (timestampSeconds === null && typeof location.timestamp === "string") {
+    const parsed = Date.parse(location.timestamp);
+    if (Number.isFinite(parsed)) timestampSeconds = parsed / 1000;
+  }
   // Traccar sends epoch seconds, but some versions send milliseconds.
   if (timestampSeconds && timestampSeconds > 1e11) timestampSeconds /= 1000;
 
+  const rawToken = params.get("token") ?? params.get("id") ?? json.device_id ?? json.id;
+
   return {
-    token: params.get("token") ?? params.get("id"),
+    token: typeof rawToken === "string" ? rawToken.trim() : null,
     lat,
     lng,
-    accuracy: Number.isFinite(accuracy) ? accuracy : null,
-    timestampSeconds: Number.isFinite(timestampSeconds) ? timestampSeconds : null,
+    accuracy,
+    timestampSeconds,
   };
 }
 
