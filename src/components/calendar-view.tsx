@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { CheckInButton } from "@/components/check-in-button";
 import { eventStatus } from "@/lib/event-status";
+import { hasRsvp } from "@/lib/event-rules";
 import { deleteEvent } from "@/app/dashboard/calendar/actions";
 import { categoryLabel, categoryBadgeClass } from "@/lib/event-category";
 import type { Event } from "@/lib/types";
@@ -647,7 +648,7 @@ function EventDetail({
             href="/dashboard/events"
             className="text-sm text-acacia-green underline underline-offset-2"
           >
-            RSVP, files &amp; feedback
+            {hasRsvp(event) ? "RSVP, files & feedback" : "Files & feedback"}
           </Link>
           {canEdit && (
             <form
@@ -667,7 +668,7 @@ function EventDetail({
       </div>
 
       <div className="shrink-0">
-        {checkedIn ? (
+        {!hasRsvp(event) ? null : checkedIn ? (
           <span className="text-sm text-acacia-green font-medium">✓ Checked in</span>
         ) : status === "open" ? (
           <CheckInButton eventId={event.id} />

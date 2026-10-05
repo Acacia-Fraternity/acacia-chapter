@@ -319,6 +319,11 @@ begin
     raise exception 'Event not found';
   end if;
 
+  -- Only RSVP events have check-in; the Pledge Duration bar never does.
+  if not v_event.rsvp_required or v_event.name ilike '%pledge duration%' then
+    raise exception 'This event does not have check-in';
+  end if;
+
   if now() < v_event.starts_at or now() > v_event.ends_at then
     raise exception 'This event is not currently open for check-in';
   end if;

@@ -3,6 +3,7 @@ import { formatChapterTime } from "@/lib/chapter-time";
 import { CheckInButton } from "@/components/check-in-button";
 import { CheckOutButton } from "@/components/check-out-button";
 import { eventStatus } from "@/lib/event-status";
+import { hasRsvp } from "@/lib/event-rules";
 import { categoryLabel, categoryBadgeClass } from "@/lib/event-category";
 import {
   setRsvp,
@@ -144,6 +145,7 @@ export default async function EventsPage() {
       <ul className="space-y-4">
         {sortedEvents.map((event) => {
           const status = eventStatus(event);
+          const attendable = hasRsvp(event);
           const checkin = checkinByEvent.get(event.id);
           const eventFiles = (files ?? []).filter((f) => f.event_id === event.id);
           const eventRsvps = (rsvps ?? []).filter((r) => r.event_id === event.id);
@@ -234,7 +236,7 @@ export default async function EventsPage() {
                           </span>
                         )}
                       </p>
-                    ) : status === "open" ? (
+                    ) : !attendable ? null : status === "open" ? (
                       <CheckInButton eventId={event.id} />
                     ) : (
                       <span className="text-sm text-muted-foreground">
@@ -321,7 +323,7 @@ export default async function EventsPage() {
                   )}
                 </div>
 
-                {event.rsvp_required && (
+                {attendable && (
                   <p className="text-sm">
                     <span className="font-medium">RSVP required</span>
                     {event.rsvp_deadline && (
@@ -343,7 +345,7 @@ export default async function EventsPage() {
                   </p>
                 )}
 
-                {status !== "closed" && (
+                {attendable && status !== "closed" && (
                   <div className="flex flex-wrap items-center gap-2">
                     {RSVP_OPTIONS.map((opt) => (
                       <form
@@ -369,7 +371,7 @@ export default async function EventsPage() {
                   </div>
                 )}
 
-                {status !== "closed" && !checkin && (
+                {attendable && status !== "closed" && !checkin && (
                   <details className="text-sm">
                     <summary className="cursor-pointer text-muted">
                       {myExcuse
