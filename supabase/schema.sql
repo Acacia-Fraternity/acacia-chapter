@@ -810,6 +810,18 @@ create policy "members see their own trail, admins see all"
   on member_locations for select to authenticated
   using (auth.uid() = user_id or is_admin());
 
+-- Outcome of each /api/location request (tokens masked), so "my phone sends
+-- nothing" can be diagnosed without access to Vercel's logs. Service role
+-- only: RLS on with no policies. The route keeps the newest 300 rows.
+create table if not exists location_ping_log (
+  id bigint generated always as identity primary key,
+  received_at timestamptz not null default now(),
+  outcome text not null,
+  detail text not null default ''
+);
+
+alter table location_ping_log enable row level security;
+
 -- Per-event time on site, fed by every location ping (browser or the
 -- always-on tracker app, see record_presence below). minutes_on_site only
 -- grows across pings that are close together, so leaving for two hours and

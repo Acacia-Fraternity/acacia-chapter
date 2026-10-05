@@ -85,35 +85,83 @@ async function readFix(request: NextRequest): Promise<Fix | null> {
   };
 }
 
+// Best-effort audit trail of every attempt (see location_ping_log). Never
+// logs a token: UUIDs are masked before anything is stored.
+async function logAttempt(
+  admin: ReturnType<typeof createAdminClient>,
+  outcome: string,
+  detail: string,
+) {
+  try {
+    await admin.from("location_ping_log").insert({
+      outcome,
+      detail: detail.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/gi, "<uuid>").slice(0, 500),
+    });
+    // Newest 300 only; the id cutoff avoids a count query per request.
+    const { data } = await admin
+      .from("location_ping_log")
+      .select("id")
+      .order("id", { ascending: false })
+      .range(300, 300);
+    if (data?.[0]) {
+      await admin.from("location_ping_log").delete().lte("id", data[0].id);
+    }
+  } catch {
+    // Diagnostics must never break a ping.
+  }
+}
+
 async function handle(request: NextRequest) {
+  const admin = createAdminClient();
+  const raw = (await request.clone().text().catch(() => "")).slice(0, 400);
+  const describe = () =>
+    `${request.method} ${request.headers.get("content-type") ?? "no-content-type"} query=${request.nextUrl.search} body=${raw}`;
+
   const fix = await readFix(request);
-  if (!fix) return NextResponse.json({ error: "Bad location" }, { status: 400 });
+  if (!fix) {
+    await logAttempt(admin, "bad-location", describe());
+    return NextResponse.json({ error: "Bad location" }, { status: 400 });
+  }
   if (!fix.token || !UUID.test(fix.token)) {
+    await logAttempt(admin, "bad-token-format", `token=${fix.token}`);
     return NextResponse.json({ error: "Unknown token" }, { status: 401 });
   }
 
-  const admin = createAdminClient();
   const { data: owner } = await admin
     .from("location_tokens")
     .select("user_id")
     .eq("token", fix.token)
     .maybeSingle();
-  if (!owner) return NextResponse.json({ error: "Unknown token" }, { status: 401 });
+  if (!owner) {
+    await logAttempt(admin, "unknown-token", "valid format, not in location_tokens");
+    return NextResponse.json({ error: "Unknown token" }, { status: 401 });
+  }
 
   // Ignored fixes still return 200 so the tracker app doesn't retry them forever.
   const tooOld =
     fix.timestampSeconds !== null &&
     Date.now() / 1000 - fix.timestampSeconds > MAX_AGE_SECONDS;
   const tooVague = fix.accuracy !== null && fix.accuracy > MAX_ACCURACY_METERS;
-  if (tooOld || tooVague) return NextResponse.json({ ok: true, ignored: true });
+  if (tooOld || tooVague) {
+    await logAttempt(
+      admin,
+      tooOld ? "ignored-too-old" : "ignored-low-accuracy",
+      `accuracy=${fix.accuracy} ts=${fix.timestampSeconds}`,
+    );
+    return NextResponse.json({ ok: true, ignored: true });
+  }
 
   const { error } = await admin.rpc("record_presence", {
     p_user: owner.user_id,
     p_lat: fix.lat,
     p_lng: fix.lng,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    await logAttempt(admin, "db-error", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
+  await logAttempt(admin, "recorded", `accuracy=${fix.accuracy}`);
   return NextResponse.json({ ok: true });
 }
 
