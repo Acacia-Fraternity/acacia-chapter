@@ -1,56 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Question } from "@/lib/curriculum/generator";
 
-export function CurriculumQuiz({
-  questions,
-  restartHref,
-}: {
-  questions: Question[];
-  restartHref: string;
-}) {
+export function CurriculumQuiz({ questions }: { questions: Question[] }) {
+  const router = useRouter();
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [score, setScore] = useState(0);
-  const [missed, setMissed] = useState<Question[]>([]);
-
-  const done = index >= questions.length;
-
-  if (done) {
-    return (
-      <div className="rounded-lg border border-surface-border p-6 space-y-4">
-        <h2 className="text-lg font-semibold">
-          {score} / {questions.length} correct
-        </h2>
-        {missed.length > 0 && (
-          <div className="space-y-3">
-            <p className="text-sm text-muted">Review what you missed:</p>
-            <ul className="space-y-3">
-              {missed.map((q) => (
-                <li key={q.id} className="text-sm">
-                  <p>{q.prompt}</p>
-                  <p className="text-acacia-green font-medium mt-1">
-                    {q.options[q.answer]}
-                  </p>
-                  {q.explanation && (
-                    <p className="text-xs text-muted mt-0.5">{q.explanation}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <Link
-          href={restartHref}
-          className="inline-block rounded-md bg-acacia-gold text-acacia-black px-3 py-1.5 text-sm font-semibold"
-        >
-          New quiz
-        </Link>
-      </div>
-    );
-  }
+  const [attempted, setAttempted] = useState(0);
 
   const q = questions[index];
   const answered = picked !== null;
@@ -58,11 +17,16 @@ export function CurriculumQuiz({
   function choose(i: number) {
     if (answered) return;
     setPicked(i);
+    setAttempted((a) => a + 1);
     if (i === q.answer) setScore((s) => s + 1);
-    else setMissed((m) => [...m, q]);
   }
 
   function next() {
+    if (index + 1 >= questions.length) {
+      // Batch used up: the server component draws a new random batch.
+      router.refresh();
+      return;
+    }
     setPicked(null);
     setIndex((i) => i + 1);
   }
@@ -71,7 +35,7 @@ export function CurriculumQuiz({
     <div className="rounded-lg border border-surface-border p-5 space-y-4">
       <div className="flex items-center justify-between text-xs text-muted">
         <span>
-          Question {index + 1} of {questions.length}
+          {score} / {attempted} correct
         </span>
         <span>{q.section}</span>
       </div>
@@ -116,7 +80,7 @@ export function CurriculumQuiz({
             onClick={next}
             className="rounded-md bg-acacia-gold text-acacia-black px-3 py-1.5 text-sm font-semibold"
           >
-            {index + 1 === questions.length ? "Finish" : "Next"}
+            Next
           </button>
         </div>
       )}

@@ -1,5 +1,6 @@
-// Acacia's badge is a 3-4-5 right triangle, so the Curriculum tab uses one
-// instead of a generic lucide triangle. Same props shape as a lucide icon.
+// Acacia's badge is a 3-4-5 right triangle (shortest side as the base), so the
+// Curriculum tab uses one instead of a generic lucide triangle. Same props
+// shape as a lucide icon; legs are 13.5 x 18 so the hypotenuse is exactly 22.5.
 export function TriangleIcon({
   size = 20,
   className,
@@ -12,15 +13,14 @@ export function TriangleIcon({
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="none"
+      fill="currentColor"
       stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
+      strokeWidth={1}
       strokeLinejoin="round"
       className={className}
       aria-hidden="true"
     >
-      <path d="M4 20V8l16 12z" />
+      <path d="M5.25 3v18h13.5z" />
     </svg>
   );
 }
