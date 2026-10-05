@@ -351,9 +351,11 @@ What's actually built, given that ceiling:
   "pledge chats (no ss)" is not enforceable here.
 - Chat documents: private `chat-files` bucket, uploaded by the browser under
   `<uid>/`; a file is readable only if a visible message points at it.
-- `chapter_notes`/`chapter_files` have `category` (`chapter` | `exec`, exec is
-  admin-only via RLS) and free-text `folder`. Google Drive "sync" is just
-  stored links (`external_url`); real sync needs a Google Cloud OAuth app.
+- `chapter_notes`/`chapter_files` have `category` (`chapter` | `exec`, exec tab is
+  exec-only via RLS) and free-text `folder`. Only exec (`is_exec()`, includes admins)
+  can write. A "record" is one form (title, meeting date/time, pasted notes,
+  files) that creates a note plus files with `note_id`; the browser uploads
+  straight to Storage. Older standalone files/Drive links still render.
 - Pages can go full-width by rendering a `data-wide` element (see
   `dashboard/layout.tsx`); the calendar does.
 

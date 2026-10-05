@@ -664,22 +664,27 @@ alter table chapter_notes drop constraint if exists chapter_notes_category_check
 alter table chapter_notes add constraint chapter_notes_category_check
   check (category in ('chapter', 'exec'));
 alter table chapter_notes add column if not exists folder text not null default '';
+-- When the meeting/event the record is about happened (created_at is when it
+-- was posted). Null on records from before this column existed.
+alter table chapter_notes add column if not exists meeting_at timestamptz;
 
 alter table chapter_notes enable row level security;
 
 drop policy if exists "chapter notes are viewable by any signed-in member" on chapter_notes;
 drop policy if exists "chapter notes visible; exec notes only to admins" on chapter_notes;
-create policy "chapter notes visible; exec notes only to admins"
+drop policy if exists "chapter notes visible; exec notes only to exec" on chapter_notes;
+create policy "chapter notes visible; exec notes only to exec"
   on chapter_notes for select
   to authenticated
-  using (category <> 'exec' or is_admin());
+  using (category <> 'exec' or is_exec());
 
 drop policy if exists "only admins can write chapter notes" on chapter_notes;
-create policy "only admins can write chapter notes"
+drop policy if exists "only exec can write chapter notes" on chapter_notes;
+create policy "only exec can write chapter notes"
   on chapter_notes for all
   to authenticated
-  using (is_admin())
-  with check (is_admin());
+  using (is_exec())
+  with check (is_exec());
 
 -- ============================================================
 -- chapter_files — presentation slides / handouts. The actual file bytes
@@ -703,22 +708,26 @@ alter table chapter_files add column if not exists folder text not null default 
 -- then ''. Real two-way Drive sync needs a Google Cloud OAuth app, which
 -- this project doesn't have - links are the stand-in.
 alter table chapter_files add column if not exists external_url text;
+-- Files uploaded in the same form as a record's notes hang off that record.
+alter table chapter_files add column if not exists note_id uuid references chapter_notes (id) on delete cascade;
 
 alter table chapter_files enable row level security;
 
 drop policy if exists "chapter files are viewable by any signed-in member" on chapter_files;
 drop policy if exists "chapter files visible; exec files only to admins" on chapter_files;
-create policy "chapter files visible; exec files only to admins"
+drop policy if exists "chapter files visible; exec files only to exec" on chapter_files;
+create policy "chapter files visible; exec files only to exec"
   on chapter_files for select
   to authenticated
-  using (category <> 'exec' or is_admin());
+  using (category <> 'exec' or is_exec());
 
 drop policy if exists "only admins can manage chapter files" on chapter_files;
-create policy "only admins can manage chapter files"
+drop policy if exists "only exec can manage chapter files" on chapter_files;
+create policy "only exec can manage chapter files"
   on chapter_files for all
   to authenticated
-  using (is_admin())
-  with check (is_admin());
+  using (is_exec())
+  with check (is_exec());
 
 -- Storage bucket for the actual file bytes (slides, PDFs, etc). Private —
 -- not publicly readable by URL; every read goes through the app, which
@@ -734,16 +743,18 @@ create policy "chapter-files: signed-in members can read"
   using (bucket_id = 'chapter-files');
 
 drop policy if exists "chapter-files: only admins can upload" on storage.objects;
-create policy "chapter-files: only admins can upload"
+drop policy if exists "chapter-files: only exec can upload" on storage.objects;
+create policy "chapter-files: only exec can upload"
   on storage.objects for insert
   to authenticated
-  with check (bucket_id = 'chapter-files' and is_admin());
+  with check (bucket_id = 'chapter-files' and public.is_exec());
 
 drop policy if exists "chapter-files: only admins can delete" on storage.objects;
-create policy "chapter-files: only admins can delete"
+drop policy if exists "chapter-files: only exec can delete" on storage.objects;
+create policy "chapter-files: only exec can delete"
   on storage.objects for delete
   to authenticated
-  using (bucket_id = 'chapter-files' and is_admin());
+  using (bucket_id = 'chapter-files' and public.is_exec());
 
 -- ============================================================
 -- parking_spots — one row per brother who has a car on file. Self-service:
