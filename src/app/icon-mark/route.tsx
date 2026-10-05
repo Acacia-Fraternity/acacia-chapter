@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
         {/* viewBox cropped to the glyph (the source file has a lot of padding), so the A fills ~half the icon and stays inside the maskable safe zone */}
         <svg width={size * 0.62} height={size * 0.6} viewBox="205 255 340 330">
           <path
-            fill="#1E1E1E"
+            fill="#000000"
             d="M515.46,505.43l-90.24-228.34h-85.81l12.89,32.04l-42.76,112.27c-2.18,0.17-4.41,0.29-6.2,0.29
 	c-21.55,0-39.3-16.08-42.02-36.89c-1.2,0.3-6.52,1.37-13.13,5.51c-13.43,8.22-22.43,22.98-22.43,39.89
 	c0,25.83,22.49,46.58,48.32,47.31c2.24,0.09,7.97-0.06,14.5-1.05l-11.04,28.98c-5.07,10.66-22.5,12.8-36.71,13.63v16.57h96.01
