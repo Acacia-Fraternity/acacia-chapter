@@ -513,7 +513,7 @@ three different free-tier ownership models:
   `can_read_channel()`; `send_message()` only checks `can_chat` + readability.
 - **Screenshots can't truly be blocked on the web.** `screen-protection.tsx`
   (mounted in the dashboard layout) blanks the app on window blur / screenshot
-  shortcuts and overlays the viewer's name as a watermark; globals.css blocks
+  shortcuts; globals.css blocks
   select/print. Phones expose no screenshot signal to web apps — real blocking
   needs a native app (Android FLAG_SECURE).
 - **Gallery**: private `gallery` bucket, browser resizes to a 2000px full + 480px

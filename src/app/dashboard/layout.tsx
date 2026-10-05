@@ -26,7 +26,7 @@ export default async function DashboardLayout({
   return (
     <div className="flex flex-1">
       <PresenceTracker />
-      <ScreenProtection label={profile?.full_name || user.email || "member"} />
+      <ScreenProtection />
       <DashboardSidebar
         fullName={profile?.full_name ?? ""}
         isAdmin={profile?.role === "admin"}

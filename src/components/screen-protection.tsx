@@ -1,19 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 // A web page cannot truly block screenshots — the OS takes them, and neither
 // iOS nor Android tells a web app one happened. This is a set of deterrents:
 // it blanks the app when the window loses focus or a screenshot shortcut is
-// pressed, blocks printing/copying/saving images, and stamps the viewer's
-// name across the screen so a leaked screenshot points back to who took it.
+// pressed, and blocks printing/copying/saving images.
 // Real blocking on phones needs a native app (Android FLAG_SECURE).
 
-function escapeXml(text: string) {
-  return text.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`);
-}
-
-export function ScreenProtection({ label }: { label: string }) {
+export function ScreenProtection() {
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
@@ -69,21 +64,8 @@ export function ScreenProtection({ label }: { label: string }) {
     };
   }, []);
 
-  const watermark = useMemo(() => {
-    const svg =
-      `<svg xmlns="http://www.w3.org/2000/svg" width="260" height="160">` +
-      `<text x="20" y="90" font-family="sans-serif" font-size="15" fill="#808080" ` +
-      `transform="rotate(-25 130 80)">${escapeXml(label)}</text></svg>`;
-    return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
-  }, [label]);
-
   return (
     <>
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0 z-[9000] opacity-[0.12]"
-        style={{ backgroundImage: watermark }}
-      />
       {hidden && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background p-6 text-center">
           <p className="text-sm text-muted">
