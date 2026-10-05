@@ -21,7 +21,14 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: "Acacia",
     description: "Chapter attendance, involvement, and chat tracker",
+    // Setting `icons` here REPLACES Next's automatic <link rel="icon"> for
+    // src/app/icon.svg, so the tab icon has to be declared explicitly or the
+    // browser shows a blank globe. Safari ignores SVG favicons, hence the PNG.
     icons: {
+      icon: [
+        { url: "/icon.svg", type: "image/svg+xml" },
+        { url: "/icon-mark?size=64", type: "image/png", sizes: "64x64" },
+      ],
       apple: `/${icon}?size=180`,
     },
   };

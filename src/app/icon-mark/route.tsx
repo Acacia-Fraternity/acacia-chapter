@@ -22,7 +22,8 @@ export async function GET(request: NextRequest) {
           justifyContent: "center",
         }}
       >
-        <svg width={size * 0.72} height={size * 0.72} viewBox="0 0 800 800">
+        {/* viewBox cropped to the glyph (the source file has a lot of padding), so the A fills ~half the icon and stays inside the maskable safe zone */}
+        <svg width={size * 0.62} height={size * 0.6} viewBox="205 255 340 330">
           <path
             fill="#1E1E1E"
             d="M515.46,505.43l-90.24-228.34h-85.81l12.89,32.04l-42.76,112.27c-2.18,0.17-4.41,0.29-6.2,0.29

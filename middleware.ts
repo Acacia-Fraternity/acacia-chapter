@@ -10,6 +10,13 @@ const PUBLIC_PATHS = [
   "/reset-password",
   "/api/location",
   "/api/cron",
+  // Fetched by the phone's "Add to Home Screen" flow and the browser's
+  // manifest loader, neither of which carries a session — behind the login
+  // redirect they got an HTML page instead of an image and fell back to a
+  // plain tile. They only serve public brand marks.
+  "/icon-mark",
+  "/icon-crest",
+  "/manifest.webmanifest",
 ];
 
 export async function middleware(request: NextRequest) {
