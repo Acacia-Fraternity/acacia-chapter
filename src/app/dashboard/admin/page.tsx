@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { formatChapterTime } from "@/lib/chapter-time";
 import { MemberPermissionsRow } from "@/components/member-permissions-row";
 import { AddMemberForm } from "@/components/add-member-form";
 import type { Event, Profile, Checkin } from "@/lib/types";
@@ -55,7 +56,7 @@ export default async function AdminPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Admin</h1>
         <Link
-          href="/dashboard/admin/new"
+          href="/dashboard/calendar/new"
           className="rounded-md bg-acacia-black text-white px-3 py-1.5 text-sm font-semibold"
         >
           New event
@@ -75,7 +76,7 @@ export default async function AdminPage() {
                 <div>
                   <p className="font-medium">{event.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(event.starts_at).toLocaleString()}
+                    {formatChapterTime(event.starts_at, { dateStyle: "medium", timeStyle: "short" })}
                   </p>
                 </div>
                 <span className="text-sm text-muted">

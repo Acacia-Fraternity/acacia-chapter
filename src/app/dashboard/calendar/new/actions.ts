@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { chapterWallTimeToIso } from "@/lib/chapter-time";
 
 export async function createEvent(formData: FormData) {
   const supabase = await createClient();
@@ -34,8 +35,8 @@ export async function createEvent(formData: FormData) {
     hours,
     house_points: housePoints,
     category,
-    starts_at: new Date(startsAt).toISOString(),
-    ends_at: new Date(endsAt).toISOString(),
+    starts_at: chapterWallTimeToIso(startsAt),
+    ends_at: chapterWallTimeToIso(endsAt),
     created_by: user.id,
   });
 
@@ -43,5 +44,5 @@ export async function createEvent(formData: FormData) {
     throw new Error(error.message);
   }
 
-  redirect("/dashboard/admin");
+  redirect("/dashboard/calendar");
 }

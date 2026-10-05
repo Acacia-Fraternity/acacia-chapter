@@ -6,6 +6,7 @@ export interface Profile {
   can_react: boolean;
   lives_in_house: boolean;
   is_pledge: boolean;
+  can_edit_calendar: boolean;
   created_at: string;
 }
 

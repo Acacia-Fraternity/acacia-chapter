@@ -374,6 +374,21 @@ can't draw trails without a billed Maps JS API key). It re-fits the view only
 when the selected person changes, and the page refreshes every 60 s.
 `HOUSE_LOCATION` (702 E 3rd St) is the house marker/geofence circle.
 
+## Calendar editing, timezones, seed data
+
+- `profiles.can_edit_calendar` + `can_edit_calendar()` (true for admins too)
+  gate events INSERT/UPDATE/DELETE in RLS, so the chapter president can manage
+  the calendar without full admin. Admin-only column (privilege trigger).
+  New-event form: `/dashboard/calendar/new` (moved from `/admin/new`).
+- **Timezone**: Vercel runs in UTC. Server-rendered times must go through
+  `src/lib/chapter-time.ts` (`formatChapterTime`), and typed
+  `datetime-local` values through `chapterWallTimeToIso`, or every event is
+  off by 4-5 hours. Client components use the browser's own zone.
+- `supabase/seed-acacia-calendar.sql` was run against the live DB on
+  2026-10-05 (104 events, Sept 7 - Dec 18, scraped Sept 17 from Jack's Google
+  Calendar). It is NOT idempotent — don't re-run it on a populated table.
+  Changes made in Google Calendar after Sept 17 are not reflected.
+
 ## No public sign-up (admin-created accounts)
 
 There is no sign-up form. `/login` is sign-in only. Accounts are created

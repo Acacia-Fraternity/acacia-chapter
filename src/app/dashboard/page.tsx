@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { formatChapterTime } from "@/lib/chapter-time";
 import { TaskList } from "@/components/task-list";
 import { categoryLabel, categoryBadgeClass } from "@/lib/event-category";
 import type { Profile, Task, Event } from "@/lib/types";
@@ -64,7 +65,7 @@ export default async function HomePage() {
               <div>
                 <p className="text-sm font-medium">{event.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {new Date(event.starts_at).toLocaleString(undefined, {
+                  {formatChapterTime(event.starts_at, {
                     weekday: "short",
                     month: "short",
                     day: "numeric",

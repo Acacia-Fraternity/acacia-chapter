@@ -6,6 +6,7 @@ import {
   setMemberCanChat,
   setMemberCanReact,
   setMemberIsPledge,
+  setMemberCanEditCalendar,
 } from "@/app/dashboard/admin/actions";
 import type { Profile } from "@/lib/types";
 
@@ -66,6 +67,18 @@ export function MemberPermissionsRow({
               }
             />
             React
+          </label>
+
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={member.can_edit_calendar}
+              disabled={isPending}
+              onChange={(e) =>
+                run(() => setMemberCanEditCalendar(member.id, e.target.checked))
+              }
+            />
+            Calendar
           </label>
 
           <label className="flex items-center gap-1.5">

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { CalendarView } from "@/components/calendar-view";
-import type { Event, Checkin } from "@/lib/types";
+import type { Event, Checkin, Profile } from "@/lib/types";
 
 export default async function CalendarPage() {
   const supabase = await createClient();
@@ -8,7 +8,8 @@ export default async function CalendarPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: events }, { data: myCheckins }] = await Promise.all([
+  const [{ data: profile }, { data: events }, { data: myCheckins }] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", user!.id).single<Profile>(),
     supabase.from("events").select("*").returns<Event[]>(),
     supabase
       .from("checkins")
@@ -21,6 +22,8 @@ export default async function CalendarPage() {
     <CalendarView
       events={events ?? []}
       checkedInEventIds={(myCheckins ?? []).map((c) => c.event_id)}
+      // Mirrors can_edit_calendar() in schema.sql, which is what actually enforces it.
+      canEdit={profile?.role === "admin" || (profile?.can_edit_calendar ?? false)}
     />
   );
 }

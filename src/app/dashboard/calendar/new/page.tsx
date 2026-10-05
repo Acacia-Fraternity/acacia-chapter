@@ -1,11 +1,39 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { createEvent } from "./actions";
 import { LocationPicker } from "@/components/location-picker";
 import { EVENT_CATEGORIES } from "@/lib/event-category";
+import type { Profile } from "@/lib/types";
 
-export default function NewEventPage() {
+export default async function NewEventPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user!.id)
+    .single<Profile>();
+
+  // The database (can_edit_calendar() + RLS on events) is the real gate;
+  // this just keeps everyone else off a form that would fail on submit.
+  if (profile?.role !== "admin" && !profile?.can_edit_calendar) {
+    redirect("/dashboard/calendar");
+  }
+
   return (
     <div className="space-y-4 max-w-lg">
-      <h1 className="text-lg font-semibold">New event</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold">New event</h1>
+        <Link href="/dashboard/calendar" className="text-sm text-muted underline">
+          Cancel
+        </Link>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Times are Bloomington (Eastern) time.
+      </p>
 
       <form action={createEvent} className="space-y-4">
         <div>

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { formatChapterTime } from "@/lib/chapter-time";
 import { CheckInButton } from "@/components/check-in-button";
 import { CheckOutButton } from "@/components/check-out-button";
 import { eventStatus } from "@/lib/event-status";
@@ -35,17 +36,17 @@ const inputClass =
 const goldButton =
   "rounded-md bg-acacia-gold text-acacia-black px-3 py-1.5 text-sm font-semibold";
 
+// Server-rendered, so times must be pinned to the chapter's zone (the
+// server itself runs in UTC).
 function formatWindow(startIso: string, endIso: string) {
-  const start = new Date(startIso);
-  const end = new Date(endIso);
-  const day = start.toLocaleDateString(undefined, {
+  const day = formatChapterTime(startIso, {
     weekday: "short",
     month: "short",
     day: "numeric",
   });
-  const time = (d: Date) =>
-    d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  return `${day} · ${time(start)} – ${time(end)}`;
+  const time = (iso: string) =>
+    formatChapterTime(iso, { hour: "numeric", minute: "2-digit" });
+  return `${day} · ${time(startIso)} – ${time(endIso)}`;
 }
 
 export default async function EventsPage() {
@@ -189,10 +190,10 @@ export default async function EventsPage() {
                         {checkin.checked_out_at && (
                           <span className="block text-xs text-muted-foreground font-normal">
                             out{" "}
-                            {new Date(checkin.checked_out_at).toLocaleTimeString(
-                              undefined,
-                              { hour: "numeric", minute: "2-digit" },
-                            )}
+                            {formatChapterTime(checkin.checked_out_at, {
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })}
                           </span>
                         )}
                       </p>

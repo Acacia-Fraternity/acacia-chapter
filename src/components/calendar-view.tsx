@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { CheckInButton } from "@/components/check-in-button";
 import { eventStatus } from "@/lib/event-status";
+import { deleteEvent } from "@/app/dashboard/calendar/actions";
 import { categoryLabel, categoryBadgeClass } from "@/lib/event-category";
 import type { Event } from "@/lib/types";
 
@@ -127,9 +128,11 @@ function layoutDay(day: Date, events: Event[]): Segment[] {
 export function CalendarView({
   events,
   checkedInEventIds,
+  canEdit,
 }: {
   events: Event[];
   checkedInEventIds: string[];
+  canEdit: boolean;
 }) {
   const [view, setView] = useState<View>("week");
   const [cursor, setCursor] = useState(() => startOfDay(new Date()));
@@ -269,6 +272,14 @@ export function CalendarView({
               </button>
             ))}
           </div>
+          {canEdit && (
+            <Link
+              href="/dashboard/calendar/new"
+              className="rounded-md bg-acacia-gold text-acacia-black px-3 py-1 font-semibold"
+            >
+              + New event
+            </Link>
+          )}
           <button
             onClick={() => setCursor(startOfDay(new Date()))}
             className="rounded-md border border-surface-border px-3 py-1"
@@ -457,6 +468,7 @@ export function CalendarView({
         <EventDetail
           event={selected}
           checkedIn={checkedInSet.has(selected.id)}
+          canEdit={canEdit}
           onClose={() => setSelectedId(null)}
         />
       )}
@@ -557,10 +569,12 @@ function MonthGrid({
 function EventDetail({
   event,
   checkedIn,
+  canEdit,
   onClose,
 }: {
   event: Event;
   checkedIn: boolean;
+  canEdit: boolean;
   onClose: () => void;
 }) {
   const status = eventStatus(event);
@@ -609,12 +623,28 @@ function EventDetail({
             </span>
           )}
         </div>
-        <Link
-          href="/dashboard/events"
-          className="inline-block pt-1 text-sm text-acacia-green underline underline-offset-2"
-        >
-          RSVP, files &amp; feedback
-        </Link>
+        <div className="flex items-center gap-4 pt-1">
+          <Link
+            href="/dashboard/events"
+            className="text-sm text-acacia-green underline underline-offset-2"
+          >
+            RSVP, files &amp; feedback
+          </Link>
+          {canEdit && (
+            <form
+              action={deleteEvent.bind(null, event.id)}
+              onSubmit={(e) => {
+                if (!confirm(`Delete "${event.name}"? This also removes its check-ins, RSVPs and files.`)) {
+                  e.preventDefault();
+                }
+              }}
+            >
+              <button className="text-sm text-red-600 underline underline-offset-2">
+                Delete event
+              </button>
+            </form>
+          )}
+        </div>
       </div>
 
       <div className="shrink-0">

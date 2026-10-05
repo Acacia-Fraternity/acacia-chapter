@@ -30,6 +30,9 @@ alter table profiles add column if not exists lives_in_house boolean not null de
 -- Pledges get their own House Presence filter; admin-controlled (guarded by
 -- prevent_self_privilege_escalation below, like role).
 alter table profiles add column if not exists is_pledge boolean not null default false;
+-- Lets a non-admin (e.g. the chapter president) add/edit/delete calendar
+-- events without being granted full admin. Admin-controlled like role.
+alter table profiles add column if not exists can_edit_calendar boolean not null default false;
 
 alter table profiles enable row level security;
 
@@ -63,6 +66,18 @@ security definer set search_path = public
 stable
 as $$
   select coalesce((select can_react from profiles where id = auth.uid()), false);
+$$;
+
+create or replace function can_edit_calendar()
+returns boolean
+language sql
+security definer set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from profiles
+    where id = auth.uid() and (role = 'admin' or can_edit_calendar)
+  );
 $$;
 
 drop policy if exists "profiles are viewable by any signed-in member" on profiles;
@@ -103,8 +118,9 @@ begin
     or new.can_chat is distinct from old.can_chat
     or new.can_react is distinct from old.can_react
     or new.is_pledge is distinct from old.is_pledge
+    or new.can_edit_calendar is distinct from old.can_edit_calendar
   ) then
-    raise exception 'Only an admin can change role, can_chat, can_react, or pledge status';
+    raise exception 'Only an admin can change role, chat/react/calendar permissions, or pledge status';
   end if;
   return new;
 end;
@@ -178,23 +194,26 @@ create policy "events are viewable by any signed-in member"
   using (true);
 
 drop policy if exists "only admins can create events" on events;
-create policy "only admins can create events"
+drop policy if exists "calendar editors can create events" on events;
+create policy "calendar editors can create events"
   on events for insert
   to authenticated
-  with check (is_admin());
+  with check (can_edit_calendar());
 
 drop policy if exists "only admins can update events" on events;
-create policy "only admins can update events"
+drop policy if exists "calendar editors can update events" on events;
+create policy "calendar editors can update events"
   on events for update
   to authenticated
-  using (is_admin())
-  with check (is_admin());
+  using (can_edit_calendar())
+  with check (can_edit_calendar());
 
 drop policy if exists "only admins can delete events" on events;
-create policy "only admins can delete events"
+drop policy if exists "calendar editors can delete events" on events;
+create policy "calendar editors can delete events"
   on events for delete
   to authenticated
-  using (is_admin());
+  using (can_edit_calendar());
 
 -- ============================================================
 -- checkins — one row per (event, member). Direct INSERT is blocked
