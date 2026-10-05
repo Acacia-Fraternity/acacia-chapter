@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatChapterTime } from "@/lib/chapter-time";
 import { MemberPermissionsRow } from "@/components/member-permissions-row";
 import { AddMemberForm } from "@/components/add-member-form";
+import { BulkAddMembers } from "@/components/bulk-add-members";
 import type { Event, Profile, Checkin } from "@/lib/types";
 
 export default async function AdminPage() {
@@ -108,6 +109,7 @@ export default async function AdminPage() {
         </p>
 
         <AddMemberForm />
+        <BulkAddMembers />
 
         <ul className="space-y-1.5">
           {members?.map((member) => (

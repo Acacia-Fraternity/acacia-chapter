@@ -99,3 +99,75 @@ export async function createMember(formData: FormData) {
 
   revalidatePath("/dashboard/admin");
 }
+
+export interface BulkMemberRow {
+  full_name: string;
+  email: string;
+  status: "active" | "pledge" | "exec";
+  password: string;
+}
+
+export interface BulkMemberResult {
+  email: string;
+  error?: string;
+}
+
+/**
+ * Creates many accounts at once. The browser sends small batches (a long list
+ * in one call would outlive a serverless request). Same trust model as
+ * createMember: service-role client, so the admin check below is the only gate.
+ */
+export async function createMembersBulk(rows: BulkMemberRow[]): Promise<BulkMemberResult[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+
+  const { data: callerProfile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (callerProfile?.role !== "admin") throw new Error("Only admins can add members");
+  if (rows.length > 25) throw new Error("Too many rows in one batch");
+
+  const admin = createAdminClient();
+  const results: BulkMemberResult[] = [];
+
+  for (const row of rows) {
+    const email = row.email.trim();
+    const fullName = row.full_name.trim();
+    if (!fullName || !email || row.password.length < 6) {
+      results.push({ email, error: "Needs a name, email, and 6+ character password" });
+      continue;
+    }
+
+    const { data, error } = await admin.auth.admin.createUser({
+      email,
+      password: row.password,
+      email_confirm: true,
+      user_metadata: { full_name: fullName },
+    });
+    if (error || !data.user) {
+      results.push({ email, error: error?.message ?? "Could not create account" });
+      continue;
+    }
+
+    if (row.status !== "active") {
+      // Service role has no auth.uid(), which the privilege trigger allows.
+      const { error: flagError } = await admin
+        .from("profiles")
+        .update(row.status === "pledge" ? { is_pledge: true } : { is_exec: true })
+        .eq("id", data.user.id);
+      if (flagError) {
+        results.push({ email, error: `Created, but couldn't set status: ${flagError.message}` });
+        continue;
+      }
+    }
+    results.push({ email });
+  }
+
+  revalidatePath("/dashboard/admin");
+  return results;
+}
