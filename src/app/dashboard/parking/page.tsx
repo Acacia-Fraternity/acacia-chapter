@@ -1,3 +1,4 @@
+import { allowedKeys } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { upsertParkingSpot, clearParkingSpot } from "./actions";
 import type { Profile, ParkingSpot } from "@/lib/types";
@@ -8,13 +9,14 @@ export default async function ParkingPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: profiles }, { data: spots }] = await Promise.all([
+  const [{ data: profile }, { data: profiles }, { data: spots }, { data: permRows }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single<Profile>(),
     supabase.from("profiles").select("*").order("full_name").returns<Profile[]>(),
     supabase.from("parking_spots").select("*").returns<ParkingSpot[]>(),
+    supabase.from("role_permissions").select("*"),
   ]);
 
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = allowedKeys(profile!, permRows ?? []).has("manage_any_parking");
   const spotByUserId = new Map((spots ?? []).map((s) => [s.user_id, s]));
 
   return (

@@ -171,3 +171,19 @@ export async function createMembersBulk(rows: BulkMemberRow[]): Promise<BulkMemb
   revalidatePath("/dashboard/admin");
   return results;
 }
+
+export async function setRolePermission(
+  role: "pledge" | "active" | "exec",
+  permission: string,
+  allowed: boolean,
+) {
+  const supabase = await createClient();
+  // The "admins edit role permissions" RLS policy is the real gate.
+  const { data, error } = await supabase
+    .from("role_permissions")
+    .upsert({ role, permission, allowed }, { onConflict: "role,permission" })
+    .select("role");
+  if (error) throw new Error(error.message);
+  if (!data?.length) throw new Error("Only admins can change role access");
+  revalidatePath("/dashboard", "layout");
+}

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { GradeEditor } from "@/components/grade-editor";
+import { allowedKeys } from "@/lib/permissions";
 import type { CourseGrade, Profile } from "@/lib/types";
 
 const STALE_DAYS = 8;
@@ -23,7 +24,11 @@ export default async function GradesPage() {
     .eq("id", user!.id)
     .single<Profile>();
 
-  const sees = profile?.role === "admin" || !!profile?.on_pledge_committee;
+  const { data: permRows } = await supabase.from("role_permissions").select("*");
+  const sees =
+    profile?.role === "admin" ||
+    !!profile?.on_pledge_committee ||
+    allowedKeys(profile!, permRows ?? []).has("view_pledge_grades");
   const isPledge = !!profile?.is_pledge;
   if (!sees && !isPledge) redirect("/dashboard");
 

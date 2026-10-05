@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ChatRoom } from "@/components/chat-room";
+import { allowedKeys } from "@/lib/permissions";
 import type { Profile } from "@/lib/types";
 
 type Channel = "all" | "active" | "exec" | "pledge";
@@ -30,17 +31,19 @@ export default async function ChatPage({
     .eq("id", user!.id)
     .single<Profile>();
 
-  const isAdmin = profile?.role === "admin";
-  const isPledge = profile?.is_pledge ?? false;
-  const isExec = isAdmin || (profile?.is_exec ?? false);
-  const onCommittee = isAdmin || (profile?.on_pledge_committee ?? false);
+  const { data: permRows } = await supabase.from("role_permissions").select("*");
+  const allowed = allowedKeys(profile!, permRows ?? []);
 
   // Mirrors can_read_channel() in schema.sql — that function is what
   // actually enforces it; this just decides which tabs to show.
-  const channels: Channel[] = ["all"];
-  if (!isPledge || isAdmin) channels.push("active");
-  if (isExec) channels.push("exec");
-  if (isPledge || onCommittee) channels.push("pledge");
+  const channels: Channel[] = [];
+  if (allowed.has("chat_all")) channels.push("all");
+  if (allowed.has("chat_actives")) channels.push("active");
+  if (allowed.has("chat_exec")) channels.push("exec");
+  if (allowed.has("chat_pledges") || profile?.on_pledge_committee) channels.push("pledge");
+  if (channels.length === 0) {
+    return <p className="text-sm text-muted">Your role has no chat channels.</p>;
+  }
 
   const channel: Channel = channels.includes(channelParam as Channel)
     ? (channelParam as Channel)
@@ -58,7 +61,7 @@ export default async function ChatPage({
       supabase.from("message_reactions").select("id, message_id, user_id, emoji"),
     ]);
 
-  const canPost = profile?.can_chat ?? false;
+  const canPost = (profile?.can_chat ?? false) && allowed.has("chat_post");
 
   return (
     <div className="flex flex-col h-[calc(100vh-6rem)]">
@@ -85,7 +88,8 @@ export default async function ChatPage({
         currentUserId={user!.id}
         canPost={canPost}
         postBlockedReason="You don't currently have permission to send messages. Ask an admin if you think this is wrong."
-        canReact={profile?.can_react ?? false}
+        canReact={(profile?.can_react ?? false) && allowed.has("chat_react")}
+        canAttach={allowed.has("chat_attach_files")}
         profiles={profiles ?? []}
         initialMessages={messages ?? []}
         initialReactions={reactions ?? []}

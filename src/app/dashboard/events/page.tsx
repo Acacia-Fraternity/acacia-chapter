@@ -1,3 +1,4 @@
+import { allowedKeys } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { formatChapterTime } from "@/lib/chapter-time";
 import { CheckInButton } from "@/components/check-in-button";
@@ -107,6 +108,10 @@ export default async function EventsPage() {
   ];
 
   const isAdmin = profile?.role === "admin";
+  const { data: permRows } = await supabase.from("role_permissions").select("*");
+  const myPerms = allowedKeys(profile!, permRows ?? []);
+  const canFiles = myPerms.has("manage_event_files");
+  const canReview = myPerms.has("review_excuses") || myPerms.has("view_event_feedback");
   const nameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name]));
   const minutesByEvent = new Map(
     (presence ?? []).map((p) => [p.event_id, Math.floor(Number(p.minutes_on_site))]),
@@ -418,7 +423,7 @@ export default async function EventsPage() {
                   </details>
                 )}
 
-                {(eventFiles.length > 0 || isAdmin) && (
+                {(eventFiles.length > 0 || canFiles) && (
                   <details className="text-sm">
                     <summary className="cursor-pointer text-muted">
                       Files &amp; docs ({eventFiles.length})
@@ -443,7 +448,7 @@ export default async function EventsPage() {
                             ) : (
                               <span>{file.title}</span>
                             )}
-                            {isAdmin && (
+                            {canFiles && (
                               <form
                                 action={deleteEventFile.bind(
                                   null,
@@ -460,7 +465,7 @@ export default async function EventsPage() {
                         );
                       })}
                     </ul>
-                    {isAdmin && (
+                    {canFiles && (
                       <form
                         action={uploadEventFile.bind(null, event.id)}
                         className="mt-2 flex flex-wrap gap-2"
@@ -513,7 +518,7 @@ export default async function EventsPage() {
                   </details>
                 )}
 
-                {isAdmin && (
+                {canReview && (
                   <details className="text-sm border-t border-surface-border pt-2">
                     <summary className="cursor-pointer text-muted">
                       Admin: {pendingExcuses.length} pending excuse

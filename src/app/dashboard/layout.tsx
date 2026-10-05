@@ -1,9 +1,11 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardSidebar } from "@/components/dashboard-sidebar";
 import { PresenceTracker } from "@/components/presence-tracker";
 import { ScreenProtection } from "@/components/screen-protection";
 import { PollGate } from "@/components/poll-gate";
+import { allowedKeys, permissionForPath } from "@/lib/permissions";
 import type { Poll, Profile } from "@/lib/types";
 
 export default async function DashboardLayout({
@@ -23,6 +25,12 @@ export default async function DashboardLayout({
     .select("*")
     .eq("id", user.id)
     .single<Profile>();
+
+  const { data: permRows } = await supabase.from("role_permissions").select("*");
+  const allowed = allowedKeys(profile!, permRows ?? []);
+  const pathname = (await headers()).get("x-pathname") ?? "";
+  const gatedBy = permissionForPath(pathname);
+  const blocked = gatedBy !== null && !allowed.has(gatedBy);
 
   // Recurring polls that have come due turn into real polls here, so a
   // required one gates this very load. Failure just means a later load tries again.
@@ -78,13 +86,26 @@ export default async function DashboardLayout({
       <DashboardSidebar
         fullName={profile?.full_name ?? ""}
         isAdmin={profile?.role === "admin"}
+        allowed={Array.from(allowed)}
         seesGrades={
-          profile?.role === "admin" || !!profile?.is_pledge || !!profile?.on_pledge_committee
+          profile?.role === "admin" ||
+          !!profile?.is_pledge ||
+          !!profile?.on_pledge_committee ||
+          allowed.has("view_pledge_grades")
         }
       />
       <main className="flex-1 min-w-0 px-4 sm:px-8 py-6">
         {/* A page can opt out of the reading-width cap by rendering a data-wide element (the calendar does). */}
-        <div className="max-w-4xl mx-auto has-[[data-wide]]:max-w-none">{children}</div>
+        <div className="max-w-4xl mx-auto has-[[data-wide]]:max-w-none">
+          {blocked ? (
+            <p className="text-sm text-muted">
+              Your role doesn&apos;t have access to this page. Ask an admin if you think that&apos;s a
+              mistake.
+            </p>
+          ) : (
+            children
+          )}
+        </div>
       </main>
     </div>
   );

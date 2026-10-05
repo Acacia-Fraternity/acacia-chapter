@@ -23,6 +23,7 @@ import {
 import { AcaciaCrest } from "@/components/acacia-crest";
 import { TriangleIcon } from "@/components/triangle-icon";
 import { SignOutButton } from "@/components/sign-out-button";
+import { permissionForPath } from "@/lib/permissions";
 
 const NAV_LINKS = [
   { href: "/dashboard/events", label: "Events", icon: CalendarCheck },
@@ -44,10 +45,12 @@ export function DashboardSidebar({
   fullName,
   isAdmin,
   seesGrades,
+  allowed,
 }: {
   fullName: string;
   isAdmin: boolean;
   seesGrades: boolean;
+  allowed: string[];
 }) {
   const pathname = usePathname();
   // "Pinned" keeps it expanded permanently. Not pinned (the default): it
@@ -80,8 +83,12 @@ export function DashboardSidebar({
     });
   }
 
+  const allowedSet = new Set(allowed);
   const links = [
-    ...NAV_LINKS,
+    ...NAV_LINKS.filter((l) => {
+      const key = permissionForPath(l.href);
+      return !key || allowedSet.has(key);
+    }),
     ...(seesGrades
       ? [{ href: "/dashboard/grades", label: "Grades", icon: GraduationCap }]
       : []),

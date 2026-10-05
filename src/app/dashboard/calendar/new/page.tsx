@@ -6,6 +6,7 @@ import { LocationPicker } from "@/components/location-picker";
 import { EventTypeFields } from "@/components/event-type-fields";
 import { RsvpFields } from "@/components/rsvp-fields";
 import { AssigneePicker } from "@/components/assignee-picker";
+import { allowedKeys } from "@/lib/permissions";
 import type { Profile } from "@/lib/types";
 
 export default async function NewEventPage() {
@@ -21,7 +22,12 @@ export default async function NewEventPage() {
 
   // The database (can_edit_calendar() + RLS on events) is the real gate;
   // this just keeps everyone else off a form that would fail on submit.
-  if (profile?.role !== "admin" && !profile?.can_edit_calendar) {
+  const { data: permRows } = await supabase.from("role_permissions").select("*");
+  if (
+    profile?.role !== "admin" &&
+    !profile?.can_edit_calendar &&
+    !allowedKeys(profile!, permRows ?? []).has("edit_calendar")
+  ) {
     redirect("/dashboard/calendar");
   }
 

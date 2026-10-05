@@ -6,6 +6,7 @@ import { PresenceToggle } from "@/components/presence-toggle";
 import { HouseMap, type MapPoint } from "@/components/house-map";
 import { HOUSE_LOCATION } from "@/lib/house-location";
 import { rotateLocationToken } from "./actions";
+import { allowedKeys } from "@/lib/permissions";
 import type { Profile, HousePresenceSession } from "@/lib/types";
 
 type Filter = "all" | "away" | "pledges";
@@ -108,6 +109,8 @@ export default async function HousePresencePage({
   ]);
 
   const isAdmin = profile?.role === "admin";
+  const { data: permRows } = await supabase.from("role_permissions").select("*");
+  const seesAll = allowedKeys(profile!, permRows ?? []).has("view_all_locations");
   const now = new Date().getTime();
 
   const hoursByUserId = new Map<string, number>();
@@ -172,7 +175,7 @@ export default async function HousePresencePage({
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <h2 className="text-sm font-medium text-muted">
             Where everyone has been{" "}
-            {isAdmin ? "" : "(you — admins see the whole chapter)"}
+            {seesAll ? "" : "(you — only certain roles see the whole chapter)"}
           </h2>
           <div className="flex gap-1.5">
             {(["day", "week"] as const).map((r) => (
@@ -190,7 +193,7 @@ export default async function HousePresencePage({
         </div>
         <HouseMap
           house={HOUSE_LOCATION}
-          members={isAdmin ? mapMembers : mapMembers.filter((m) => m.id === user!.id)}
+          members={seesAll ? mapMembers : mapMembers.filter((m) => m.id === user!.id)}
           points={mapPoints}
         />
         {mapPoints.length === 0 && (

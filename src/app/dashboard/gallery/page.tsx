@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { GalleryView, type GalleryItem } from "@/components/gallery-view";
+import { allowedKeys } from "@/lib/permissions";
 import type { Event, GalleryPhoto, Profile } from "@/lib/types";
 
 export default async function GalleryPage() {
@@ -8,9 +9,9 @@ export default async function GalleryPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: photos }, { data: events }, { data: people }] =
+  const [{ data: profile }, { data: photos }, { data: events }, { data: people }, { data: permRows }] =
     await Promise.all([
-      supabase.from("profiles").select("role").eq("id", user!.id).single<Pick<Profile, "role">>(),
+      supabase.from("profiles").select("*").eq("id", user!.id).single<Profile>(),
       supabase
         .from("gallery_photos")
         .select("*")
@@ -25,6 +26,7 @@ export default async function GalleryPage() {
         .limit(60)
         .returns<Pick<Event, "id" | "name" | "starts_at">[]>(),
       supabase.from("profiles").select("id, full_name"),
+      supabase.from("role_permissions").select("*"),
     ]);
 
   // Thumbnails are signed in one batch so the grid loads without a round trip
@@ -60,7 +62,8 @@ export default async function GalleryPage() {
       items={items}
       events={events ?? []}
       currentUserId={user!.id}
-      isAdmin={profile?.role === "admin"}
+      isAdmin={allowedKeys(profile!, permRows ?? []).has("delete_any_gallery_photo")}
+      canUpload={allowedKeys(profile!, permRows ?? []).has("upload_gallery")}
     />
   );
 }

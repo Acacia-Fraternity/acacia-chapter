@@ -74,6 +74,158 @@ as $$
   select coalesce((select can_react from profiles where id = auth.uid()), false);
 $$;
 
+-- ============================================================
+-- Role permissions — what pledges / actives / exec may do, editable by admins
+-- (Admin page). Admins bypass this table entirely. has_permission() is what
+-- RLS policies call; the role is derived from the profile flags. Defaults are
+-- seeded once and never overwritten, so admin edits survive re-running this file.
+-- ============================================================
+create table if not exists role_permissions (
+  role text not null check (role in ('pledge', 'active', 'exec')),
+  permission text not null,
+  allowed boolean not null,
+  primary key (role, permission)
+);
+
+alter table role_permissions enable row level security;
+
+drop policy if exists "role permissions readable by members" on role_permissions;
+create policy "role permissions readable by members"
+  on role_permissions for select to authenticated using (true);
+
+drop policy if exists "admins edit role permissions" on role_permissions;
+create policy "admins edit role permissions"
+  on role_permissions for all to authenticated
+  using (is_admin()) with check (is_admin());
+
+insert into role_permissions (role, permission, allowed) values
+  ('pledge', 'tab_events', true),
+  ('active', 'tab_events', true),
+  ('exec', 'tab_events', true),
+  ('pledge', 'tab_calendar', true),
+  ('active', 'tab_calendar', true),
+  ('exec', 'tab_calendar', true),
+  ('pledge', 'tab_chat', true),
+  ('active', 'tab_chat', true),
+  ('exec', 'tab_chat', true),
+  ('pledge', 'tab_gallery', true),
+  ('active', 'tab_gallery', true),
+  ('exec', 'tab_gallery', true),
+  ('pledge', 'tab_dues', true),
+  ('active', 'tab_dues', true),
+  ('exec', 'tab_dues', true),
+  ('pledge', 'tab_polls', true),
+  ('active', 'tab_polls', true),
+  ('exec', 'tab_polls', true),
+  ('pledge', 'tab_chapter', true),
+  ('active', 'tab_chapter', true),
+  ('exec', 'tab_chapter', true),
+  ('pledge', 'tab_pledgeship', true),
+  ('active', 'tab_pledgeship', true),
+  ('exec', 'tab_pledgeship', true),
+  ('pledge', 'tab_house_points', true),
+  ('active', 'tab_house_points', true),
+  ('exec', 'tab_house_points', true),
+  ('pledge', 'tab_house_presence', true),
+  ('active', 'tab_house_presence', true),
+  ('exec', 'tab_house_presence', true),
+  ('pledge', 'tab_parking', true),
+  ('active', 'tab_parking', true),
+  ('exec', 'tab_parking', true),
+  ('pledge', 'chat_all', true),
+  ('active', 'chat_all', true),
+  ('exec', 'chat_all', true),
+  ('pledge', 'chat_actives', false),
+  ('active', 'chat_actives', true),
+  ('exec', 'chat_actives', true),
+  ('pledge', 'chat_exec', false),
+  ('active', 'chat_exec', false),
+  ('exec', 'chat_exec', true),
+  ('pledge', 'chat_pledges', true),
+  ('active', 'chat_pledges', false),
+  ('exec', 'chat_pledges', false),
+  ('pledge', 'chat_post', true),
+  ('active', 'chat_post', true),
+  ('exec', 'chat_post', true),
+  ('pledge', 'chat_react', true),
+  ('active', 'chat_react', true),
+  ('exec', 'chat_react', true),
+  ('pledge', 'chat_attach_files', true),
+  ('active', 'chat_attach_files', true),
+  ('exec', 'chat_attach_files', true),
+  ('pledge', 'edit_calendar', false),
+  ('active', 'edit_calendar', false),
+  ('exec', 'edit_calendar', false),
+  ('pledge', 'check_in_events', true),
+  ('active', 'check_in_events', true),
+  ('exec', 'check_in_events', true),
+  ('pledge', 'manage_event_files', false),
+  ('active', 'manage_event_files', false),
+  ('exec', 'manage_event_files', false),
+  ('pledge', 'review_excuses', false),
+  ('active', 'review_excuses', false),
+  ('exec', 'review_excuses', false),
+  ('pledge', 'view_event_feedback', false),
+  ('active', 'view_event_feedback', false),
+  ('exec', 'view_event_feedback', false),
+  ('pledge', 'upload_gallery', true),
+  ('active', 'upload_gallery', true),
+  ('exec', 'upload_gallery', true),
+  ('pledge', 'delete_any_gallery_photo', false),
+  ('active', 'delete_any_gallery_photo', false),
+  ('exec', 'delete_any_gallery_photo', false),
+  ('pledge', 'create_polls', false),
+  ('active', 'create_polls', false),
+  ('exec', 'create_polls', true),
+  ('pledge', 'see_poll_results', false),
+  ('active', 'see_poll_results', false),
+  ('exec', 'see_poll_results', false),
+  ('pledge', 'post_chapter_records', false),
+  ('active', 'post_chapter_records', false),
+  ('exec', 'post_chapter_records', true),
+  ('pledge', 'view_exec_chapter', false),
+  ('active', 'view_exec_chapter', false),
+  ('exec', 'view_exec_chapter', true),
+  ('pledge', 'manage_dues', false),
+  ('active', 'manage_dues', false),
+  ('exec', 'manage_dues', false),
+  ('pledge', 'view_pledge_grades', false),
+  ('active', 'view_pledge_grades', false),
+  ('exec', 'view_pledge_grades', false),
+  ('pledge', 'view_all_locations', false),
+  ('active', 'view_all_locations', false),
+  ('exec', 'view_all_locations', false),
+  ('pledge', 'manage_any_parking', false),
+  ('active', 'manage_any_parking', false),
+  ('exec', 'manage_any_parking', false),
+  ('pledge', 'pledgeship_schedule', true),
+  ('active', 'pledgeship_schedule', true),
+  ('exec', 'pledgeship_schedule', true),
+  ('pledge', 'pledgeship_quizzes', true),
+  ('active', 'pledgeship_quizzes', true),
+  ('exec', 'pledgeship_quizzes', true)
+on conflict (role, permission) do nothing;
+
+create or replace function has_permission(p_permission text)
+returns boolean
+language sql
+security definer set search_path = public
+stable
+as $$
+  select coalesce(
+    (select
+       case
+         when p.role = 'admin' then true
+         else coalesce((
+           select rp.allowed from role_permissions rp
+           where rp.permission = p_permission
+             and rp.role = case when p.is_pledge then 'pledge' when p.is_exec then 'exec' else 'active' end
+         ), false)
+       end
+     from profiles p where p.id = auth.uid()),
+    false);
+$$;
+
 create or replace function can_edit_calendar()
 returns boolean
 language sql
@@ -83,7 +235,7 @@ as $$
   select exists (
     select 1 from profiles
     where id = auth.uid() and (role = 'admin' or can_edit_calendar)
-  );
+  ) or has_permission('edit_calendar');
 $$;
 
 create or replace function is_exec()
@@ -347,6 +499,10 @@ declare
   v_flag_reason text;
   v_row checkins;
 begin
+  if not has_permission('check_in_events') then
+    raise exception 'Your role cannot check in to events';
+  end if;
+
   select * into v_event from events where id = p_event_id;
 
   if v_event is null then
@@ -480,11 +636,11 @@ stable
 as $$
   select case
     when is_admin() then true
-    when p_channel = 'all' then exists (select 1 from profiles where id = auth.uid())
-    when p_channel = 'exec' then coalesce((select is_exec from profiles where id = auth.uid()), false)
-    when p_channel = 'pledge' then coalesce(
-      (select is_pledge or on_pledge_committee from profiles where id = auth.uid()), false)
-    else not coalesce((select is_pledge from profiles where id = auth.uid()), true)
+    when p_channel = 'all' then has_permission('chat_all')
+    when p_channel = 'exec' then has_permission('chat_exec')
+    when p_channel = 'pledge' then has_permission('chat_pledges')
+      or coalesce((select on_pledge_committee from profiles where id = auth.uid()), false)
+    else has_permission('chat_actives')
   end;
 $$;
 
@@ -516,8 +672,12 @@ as $$
 declare
   v_row messages;
 begin
-  if not can_chat() then
+  if not can_chat() or not has_permission('chat_post') then
     raise exception 'You do not have permission to send messages';
+  end if;
+
+  if p_file_path is not null and not has_permission('chat_attach_files') then
+    raise exception 'Your role cannot attach files';
   end if;
 
   if not can_read_channel(p_channel) then
@@ -596,7 +756,7 @@ as $$
 declare
   v_existing uuid;
 begin
-  if not can_react() then
+  if not can_react() or not has_permission('chat_react') then
     raise exception 'You do not have permission to react to messages';
   end if;
 
@@ -676,15 +836,15 @@ drop policy if exists "chapter notes visible; exec notes only to exec" on chapte
 create policy "chapter notes visible; exec notes only to exec"
   on chapter_notes for select
   to authenticated
-  using (category <> 'exec' or is_exec());
+  using (category <> 'exec' or has_permission('view_exec_chapter'));
 
 drop policy if exists "only admins can write chapter notes" on chapter_notes;
 drop policy if exists "only exec can write chapter notes" on chapter_notes;
 create policy "only exec can write chapter notes"
   on chapter_notes for all
   to authenticated
-  using (is_exec())
-  with check (is_exec());
+  using (has_permission('post_chapter_records'))
+  with check (has_permission('post_chapter_records'));
 
 -- ============================================================
 -- chapter_files — presentation slides / handouts. The actual file bytes
@@ -719,15 +879,15 @@ drop policy if exists "chapter files visible; exec files only to exec" on chapte
 create policy "chapter files visible; exec files only to exec"
   on chapter_files for select
   to authenticated
-  using (category <> 'exec' or is_exec());
+  using (category <> 'exec' or has_permission('view_exec_chapter'));
 
 drop policy if exists "only admins can manage chapter files" on chapter_files;
 drop policy if exists "only exec can manage chapter files" on chapter_files;
 create policy "only exec can manage chapter files"
   on chapter_files for all
   to authenticated
-  using (is_exec())
-  with check (is_exec());
+  using (has_permission('post_chapter_records'))
+  with check (has_permission('post_chapter_records'));
 
 -- Storage bucket for the actual file bytes (slides, PDFs, etc). Private —
 -- not publicly readable by URL; every read goes through the app, which
@@ -747,14 +907,14 @@ drop policy if exists "chapter-files: only exec can upload" on storage.objects;
 create policy "chapter-files: only exec can upload"
   on storage.objects for insert
   to authenticated
-  with check (bucket_id = 'chapter-files' and public.is_exec());
+  with check (bucket_id = 'chapter-files' and (public.has_permission('post_chapter_records') or public.has_permission('manage_event_files')));
 
 drop policy if exists "chapter-files: only admins can delete" on storage.objects;
 drop policy if exists "chapter-files: only exec can delete" on storage.objects;
 create policy "chapter-files: only exec can delete"
   on storage.objects for delete
   to authenticated
-  using (bucket_id = 'chapter-files' and public.is_exec());
+  using (bucket_id = 'chapter-files' and (public.has_permission('post_chapter_records') or public.has_permission('manage_event_files')));
 
 -- ============================================================
 -- parking_spots — one row per brother who has a car on file. Self-service:
@@ -783,20 +943,20 @@ drop policy if exists "members manage their own parking info, admins any" on par
 create policy "members manage their own parking info, admins any"
   on parking_spots for insert
   to authenticated
-  with check (auth.uid() = user_id or is_admin());
+  with check (auth.uid() = user_id or has_permission('manage_any_parking'));
 
 drop policy if exists "members update their own parking info, admins any" on parking_spots;
 create policy "members update their own parking info, admins any"
   on parking_spots for update
   to authenticated
-  using (auth.uid() = user_id or is_admin())
-  with check (auth.uid() = user_id or is_admin());
+  using (auth.uid() = user_id or has_permission('manage_any_parking'))
+  with check (auth.uid() = user_id or has_permission('manage_any_parking'));
 
 drop policy if exists "members delete their own parking info, admins any" on parking_spots;
 create policy "members delete their own parking info, admins any"
   on parking_spots for delete
   to authenticated
-  using (auth.uid() = user_id or is_admin());
+  using (auth.uid() = user_id or has_permission('manage_any_parking'));
 
 -- ============================================================
 -- tasks — a personal to-do list per brother, shown on the Home page.
@@ -890,7 +1050,7 @@ alter table member_locations enable row level security;
 drop policy if exists "members see their own trail, admins see all" on member_locations;
 create policy "members see their own trail, admins see all"
   on member_locations for select to authenticated
-  using (auth.uid() = user_id or is_admin());
+  using (auth.uid() = user_id or has_permission('view_all_locations'));
 
 -- Outcome of each /api/location request (tokens masked), so "my phone sends
 -- nothing" can be diagnosed without access to Vercel's logs. Service role
@@ -923,7 +1083,7 @@ alter table event_presence enable row level security;
 drop policy if exists "members see their own presence, admins see all" on event_presence;
 create policy "members see their own presence, admins see all"
   on event_presence for select to authenticated
-  using (auth.uid() = user_id or is_admin());
+  using (auth.uid() = user_id or has_permission('view_all_locations'));
 
 -- Single place the house geofence and per-event time-on-site are computed,
 -- for an explicit user id: auth.uid() isn't available when the always-on
@@ -1227,7 +1387,7 @@ create policy "event files are viewable by any signed-in member"
 drop policy if exists "only admins can manage event files" on event_files;
 create policy "only admins can manage event files"
   on event_files for all to authenticated
-  using (is_admin()) with check (is_admin());
+  using (has_permission('manage_event_files')) with check (has_permission('manage_event_files'));
 
 -- RSVPs: no computed business rule, so plain own-row RLS is enough here
 -- (unlike checkins). Everyone can read so the card can show head-counts.
@@ -1267,7 +1427,7 @@ alter table event_excuses enable row level security;
 drop policy if exists "members see their own excuses, admins see all" on event_excuses;
 create policy "members see their own excuses, admins see all"
   on event_excuses for select to authenticated
-  using (auth.uid() = user_id or is_admin());
+  using (auth.uid() = user_id or has_permission('review_excuses'));
 
 drop policy if exists "members submit their own pending excuse" on event_excuses;
 create policy "members submit their own pending excuse"
@@ -1277,12 +1437,12 @@ create policy "members submit their own pending excuse"
 drop policy if exists "members withdraw their own pending excuse" on event_excuses;
 create policy "members withdraw their own pending excuse"
   on event_excuses for delete to authenticated
-  using ((auth.uid() = user_id and status = 'pending') or is_admin());
+  using ((auth.uid() = user_id and status = 'pending') or has_permission('review_excuses'));
 
 drop policy if exists "only admins can review excuses" on event_excuses;
 create policy "only admins can review excuses"
   on event_excuses for update to authenticated
-  using (is_admin()) with check (is_admin());
+  using (has_permission('review_excuses')) with check (has_permission('review_excuses'));
 
 -- Post-event feedback survey. Readable only by the author and admins so
 -- brothers can be candid.
@@ -1300,7 +1460,7 @@ alter table event_feedback enable row level security;
 drop policy if exists "members see their own feedback, admins see all" on event_feedback;
 create policy "members see their own feedback, admins see all"
   on event_feedback for select to authenticated
-  using (auth.uid() = user_id or is_admin());
+  using (auth.uid() = user_id or has_permission('view_event_feedback'));
 
 drop policy if exists "members submit and edit their own feedback" on event_feedback;
 create policy "members submit and edit their own feedback"
@@ -1403,6 +1563,7 @@ create policy "members add photos under their own folder"
   on gallery_photos for insert to authenticated
   with check (
     user_id = auth.uid()
+    and has_permission('upload_gallery')
     and split_part(storage_path, '/', 1) = auth.uid()::text
     and split_part(thumb_path, '/', 1) = auth.uid()::text
   );
@@ -1410,7 +1571,7 @@ create policy "members add photos under their own folder"
 drop policy if exists "uploaders and admins delete photos" on gallery_photos;
 create policy "uploaders and admins delete photos"
   on gallery_photos for delete to authenticated
-  using (user_id = auth.uid() or is_admin());
+  using (user_id = auth.uid() or has_permission('delete_any_gallery_photo'));
 
 insert into storage.buckets (id, name, public)
 values ('gallery', 'gallery', false)
@@ -1419,7 +1580,7 @@ on conflict (id) do nothing;
 drop policy if exists "gallery: members upload to their own folder" on storage.objects;
 create policy "gallery: members upload to their own folder"
   on storage.objects for insert to authenticated
-  with check (bucket_id = 'gallery' and (storage.foldername(name))[1] = auth.uid()::text);
+  with check (bucket_id = 'gallery' and public.has_permission('upload_gallery') and (storage.foldername(name))[1] = auth.uid()::text);
 
 drop policy if exists "gallery: members read" on storage.objects;
 create policy "gallery: members read"
@@ -1429,7 +1590,7 @@ create policy "gallery: members read"
 drop policy if exists "gallery: uploaders and admins delete" on storage.objects;
 create policy "gallery: uploaders and admins delete"
   on storage.objects for delete to authenticated
-  using (bucket_id = 'gallery' and ((storage.foldername(name))[1] = auth.uid()::text or public.is_admin()));
+  using (bucket_id = 'gallery' and ((storage.foldername(name))[1] = auth.uid()::text or public.has_permission('delete_any_gallery_photo')));
 
 -- ============================================================
 -- Dues — one row per member per charge. Members see only their own; admins
@@ -1454,12 +1615,12 @@ alter table dues_charges enable row level security;
 drop policy if exists "members see their own dues, admins see all" on dues_charges;
 create policy "members see their own dues, admins see all"
   on dues_charges for select to authenticated
-  using (user_id = auth.uid() or is_admin());
+  using (user_id = auth.uid() or has_permission('manage_dues'));
 
 drop policy if exists "admins manage dues" on dues_charges;
 create policy "admins manage dues"
   on dues_charges for all to authenticated
-  using (is_admin()) with check (is_admin());
+  using (has_permission('manage_dues')) with check (has_permission('manage_dues'));
 
 -- Which reminder stages have already been pushed (cron route, service role).
 create table if not exists dues_reminder_log (
@@ -1496,7 +1657,7 @@ create policy "own grades, or pledge grades for the committee"
   using (
     user_id = auth.uid()
     or (
-      on_pledge_committee()
+      (on_pledge_committee() or has_permission('view_pledge_grades'))
       and exists (select 1 from profiles p where p.id = course_grades.user_id and p.is_pledge)
     )
   );
@@ -1549,12 +1710,12 @@ $$;
 drop policy if exists "polls visible to their audience and exec" on polls;
 create policy "polls visible to their audience and exec"
   on polls for select to authenticated
-  using (poll_in_audience(audience) or is_exec());
+  using (poll_in_audience(audience) or has_permission('create_polls'));
 
 drop policy if exists "exec manage polls" on polls;
 create policy "exec manage polls"
   on polls for all to authenticated
-  using (is_exec()) with check (is_exec());
+  using (has_permission('create_polls')) with check (has_permission('create_polls'));
 
 create table if not exists poll_votes (
   poll_id uuid not null references polls (id) on delete cascade,
@@ -1571,7 +1732,7 @@ create policy "votes: own, or exec on non-anonymous polls"
   on poll_votes for select to authenticated
   using (
     user_id = auth.uid()
-    or (is_exec() and exists (select 1 from polls p where p.id = poll_id and not p.anonymous))
+    or (has_permission('create_polls') and exists (select 1 from polls p where p.id = poll_id and not p.anonymous))
   );
 
 create or replace function submit_poll_vote(p_poll_id uuid, p_options integer[])
@@ -1632,7 +1793,8 @@ begin
   select * into v_poll from polls where id = p_poll_id;
   if not found then return; end if;
   if not (
-    is_exec()
+    has_permission('create_polls')
+    or has_permission('see_poll_results')
     or exists (select 1 from poll_votes where poll_id = p_poll_id and user_id = auth.uid())
     or (poll_in_audience(v_poll.audience)
         and (v_poll.closed or (v_poll.closes_at is not null and v_poll.closes_at <= now())))
@@ -1683,7 +1845,7 @@ alter table poll_schedules enable row level security;
 drop policy if exists "exec manage poll schedules" on poll_schedules;
 create policy "exec manage poll schedules"
   on poll_schedules for all to authenticated
-  using (is_exec()) with check (is_exec());
+  using (has_permission('create_polls')) with check (has_permission('create_polls'));
 
 alter table polls add column if not exists schedule_id uuid references poll_schedules (id) on delete set null;
 

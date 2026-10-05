@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import { allowedKeys } from "@/lib/permissions";
 import { CurriculumQuiz } from "@/components/curriculum-quiz";
 import { drawQuiz, questionBank } from "@/lib/curriculum/generator";
 import { chapterToday } from "@/lib/dues";
@@ -191,7 +193,27 @@ export default async function PledgeshipPage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const { tab: tabParam } = await searchParams;
-  const tab = tabParam === "quizzes" ? "quizzes" : "schedule";
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const [{ data: profile }, { data: permRows }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("role, is_pledge, is_exec")
+      .eq("id", user!.id)
+      .single<{ role: string; is_pledge: boolean; is_exec: boolean }>(),
+    supabase.from("role_permissions").select("*"),
+  ]);
+  const allowed = allowedKeys(profile!, permRows ?? []);
+  const canSchedule = allowed.has("pledgeship_schedule");
+  const canQuizzes = allowed.has("pledgeship_quizzes");
+  if (!canSchedule && !canQuizzes) {
+    return <p className="text-sm text-muted">Your role doesn&apos;t have access to Pledgeship content.</p>;
+  }
+  const tab: "schedule" | "quizzes" =
+    (tabParam === "quizzes" && canQuizzes) || !canSchedule ? "quizzes" : "schedule";
 
   return (
     <div className="space-y-4">
@@ -203,7 +225,7 @@ export default async function PledgeshipPage({
           </span>
         )}
       </div>
-      <Tabs tab={tab} />
+      {canSchedule && canQuizzes && <Tabs tab={tab} />}
 
       {tab === "schedule" ? <Schedule /> : <QuizTab />}
     </div>

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { CalendarView } from "@/components/calendar-view";
+import { allowedKeys } from "@/lib/permissions";
 import type { Event, Checkin, Profile } from "@/lib/types";
 
 export default async function CalendarPage() {
@@ -8,7 +9,7 @@ export default async function CalendarPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: events }, { data: myCheckins }, { data: sober }, { data: people }] =
+  const [{ data: profile }, { data: events }, { data: myCheckins }, { data: sober }, { data: people }, { data: permRows }] =
     await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single<Profile>(),
     supabase.from("events").select("*").returns<Event[]>(),
@@ -19,6 +20,7 @@ export default async function CalendarPage() {
       .returns<Checkin[]>(),
     supabase.from("event_sober_brothers").select("event_id, user_id"),
     supabase.from("profiles").select("id, full_name"),
+    supabase.from("role_permissions").select("*"),
   ]);
 
   const nameById = new Map((people ?? []).map((p) => [p.id, p.full_name || "Unknown"]));
@@ -33,7 +35,11 @@ export default async function CalendarPage() {
       checkedInEventIds={(myCheckins ?? []).map((c) => c.event_id)}
       // Mirrors can_edit_calendar() in schema.sql, which is what actually enforces it.
       soberByEvent={soberByEvent}
-      canEdit={profile?.role === "admin" || (profile?.can_edit_calendar ?? false)}
+      canEdit={
+        profile?.role === "admin" ||
+        (profile?.can_edit_calendar ?? false) ||
+        allowedKeys(profile!, permRows ?? []).has("edit_calendar")
+      }
     />
   );
 }

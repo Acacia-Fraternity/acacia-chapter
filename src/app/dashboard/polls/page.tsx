@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatChapterTime } from "@/lib/chapter-time";
 import { NewPollForm, PollManage, ScheduleManage } from "@/components/poll-admin-controls";
 import { PollVoteForm } from "@/components/poll-vote-form";
+import { allowedKeys } from "@/lib/permissions";
 import type { Poll, PollSchedule, PollVote, Profile } from "@/lib/types";
 
 const AUDIENCE_LABEL: Record<Poll["audience"], string> = {
@@ -17,7 +18,7 @@ export default async function PollsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: polls }, { data: votes }, { data: people }, { data: schedules }] =
+  const [{ data: profile }, { data: polls }, { data: votes }, { data: people }, { data: schedules }, { data: permRows }] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("id", user!.id).single<Profile>(),
       supabase.from("polls").select("*").order("created_at", { ascending: false }).returns<Poll[]>(),
@@ -29,9 +30,11 @@ export default async function PollsPage() {
         .select("*")
         .order("created_at", { ascending: false })
         .returns<PollSchedule[]>(),
+      supabase.from("role_permissions").select("*"),
     ]);
 
   const isExec = profile?.role === "admin" || !!profile?.is_exec;
+  const canManage = allowedKeys(profile!, permRows ?? []).has("create_polls");
   const isPledge = !!profile?.is_pledge;
   const nameById = new Map((people ?? []).map((p) => [p.id, p.full_name || "Unnamed"]));
 
@@ -66,9 +69,9 @@ export default async function PollsPage() {
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-lg font-semibold">Polls</h1>
       </div>
-      {isExec && <NewPollForm />}
+      {canManage && <NewPollForm />}
 
-      {isExec && (schedules ?? []).length > 0 && (
+      {canManage && (schedules ?? []).length > 0 && (
         <section className="space-y-2">
           <h2 className="text-sm font-medium text-muted">Recurring polls</h2>
           {(schedules ?? []).map((s) => (
@@ -143,7 +146,7 @@ export default async function PollsPage() {
                   const n = c.get(i) ?? 0;
                   const pct = respondents ? Math.round((n / respondents) * 100) : 0;
                   const iVoted = mine.some((v) => v.option_index === i);
-                  const voters = !poll.anonymous && isExec
+                  const voters = !poll.anonymous && canManage
                     ? (votes ?? [])
                         .filter((v) => v.poll_id === poll.id && v.option_index === i)
                         .map((v) => nameById.get(v.user_id) ?? "Unknown")
@@ -174,7 +177,7 @@ export default async function PollsPage() {
               </ul>
             )}
 
-            {isExec && (
+            {canManage && (
               <PollManage pollId={poll.id} closed={poll.closed} required={poll.required} />
             )}
           </article>

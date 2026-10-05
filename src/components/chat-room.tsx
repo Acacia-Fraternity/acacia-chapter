@@ -29,6 +29,7 @@ export function ChatRoom({
   canPost,
   postBlockedReason,
   canReact,
+  canAttach,
   profiles,
   initialMessages,
   initialReactions,
@@ -38,6 +39,7 @@ export function ChatRoom({
   canPost: boolean;
   postBlockedReason: string;
   canReact: boolean;
+  canAttach: boolean;
   profiles: {
     id: string;
     full_name: string;
@@ -309,7 +311,7 @@ export function ChatRoom({
 
       {canPost ? (
         <form onSubmit={handleSend} className="mt-3 flex gap-2 items-center">
-          <label
+          {canAttach && <label
             className="cursor-pointer rounded-md border border-surface-border px-2.5 py-2 text-sm"
             title="Attach a document"
           >
@@ -320,7 +322,7 @@ export function ChatRoom({
               className="hidden"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
-          </label>
+          </label>}
           <div className="flex-1 min-w-0">
             {file && (
               <p className="text-xs text-muted truncate mb-1">

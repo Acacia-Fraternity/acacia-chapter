@@ -5,6 +5,7 @@ import { formatChapterTime } from "@/lib/chapter-time";
 import { MemberPermissionsRow } from "@/components/member-permissions-row";
 import { AddMemberForm } from "@/components/add-member-form";
 import { BulkAddMembers } from "@/components/bulk-add-members";
+import { RoleAccessMatrix } from "@/components/role-access-matrix";
 import type { Event, Profile, Checkin } from "@/lib/types";
 
 export default async function AdminPage() {
@@ -32,6 +33,8 @@ export default async function AdminPage() {
     .select("*")
     .order("full_name")
     .returns<Profile[]>();
+
+  const { data: rolePerms } = await supabase.from("role_permissions").select("*");
 
   const { data: allCheckins } = await supabase
     .from("checkins")
@@ -65,6 +68,39 @@ export default async function AdminPage() {
       </div>
 
       <section className="space-y-3">
+        <h2 className="text-sm font-medium text-muted">Add people</h2>
+        <AddMemberForm />
+        <BulkAddMembers />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-medium text-muted">Role access</h2>
+        <RoleAccessMatrix stored={rolePerms ?? []} />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-medium text-muted">
+          Members &amp; permissions ({members?.length ?? 0})
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Chat/React control whether that person can post messages or add
+          reactions. Changing these (and admin status) is enforced by the
+          database itself, not just this screen — see{" "}
+          <code>supabase/schema.sql</code>.
+        </p>
+
+        <ul className="space-y-1.5">
+          {members?.map((member) => (
+            <MemberPermissionsRow
+              key={member.id}
+              member={member}
+              isSelf={member.id === user!.id}
+              hours={hoursByUserId.get(member.id) ?? 0}
+            />
+          ))}
+        </ul>
+      </section>
+      <section className="space-y-3">
         <h2 className="text-sm font-medium text-muted">Events</h2>
         <ul className="space-y-2">
           {events?.map((event) => {
@@ -97,31 +133,6 @@ export default async function AdminPage() {
         </ul>
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-sm font-medium text-muted">
-          Members &amp; permissions ({members?.length ?? 0})
-        </h2>
-        <p className="text-xs text-muted-foreground">
-          Chat/React control whether that person can post messages or add
-          reactions. Changing these (and admin status) is enforced by the
-          database itself, not just this screen — see{" "}
-          <code>supabase/schema.sql</code>.
-        </p>
-
-        <AddMemberForm />
-        <BulkAddMembers />
-
-        <ul className="space-y-1.5">
-          {members?.map((member) => (
-            <MemberPermissionsRow
-              key={member.id}
-              member={member}
-              isSelf={member.id === user!.id}
-              hours={hoursByUserId.get(member.id) ?? 0}
-            />
-          ))}
-        </ul>
-      </section>
     </div>
   );
 }

@@ -20,7 +20,10 @@ const PUBLIC_PATHS = [
 ];
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  // The dashboard layout reads this to enforce per-role tab access.
+  const forwarded = new Headers(request.headers);
+  forwarded.set("x-pathname", request.nextUrl.pathname);
+  let response = NextResponse.next({ request: { headers: forwarded } });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,7 +37,7 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value),
           );
-          response = NextResponse.next({ request });
+          response = NextResponse.next({ request: { headers: forwarded } });
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options),
           );

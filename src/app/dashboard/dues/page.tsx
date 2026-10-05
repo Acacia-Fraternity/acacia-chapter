@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { DuesAdmin, type DuesBatch } from "@/components/dues-admin";
 import { daysUntil, formatDueDate, formatMoney } from "@/lib/dues";
+import { allowedKeys } from "@/lib/permissions";
 import type { DuesCharge, Profile } from "@/lib/types";
 
 export default async function DuesPage() {
@@ -9,17 +10,18 @@ export default async function DuesPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: charges }, { data: people }] = await Promise.all([
-    supabase.from("profiles").select("role").eq("id", user!.id).single<Pick<Profile, "role">>(),
+  const [{ data: profile }, { data: charges }, { data: people }, { data: permRows }] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", user!.id).single<Profile>(),
     supabase
       .from("dues_charges")
       .select("*")
       .order("due_date", { ascending: true })
       .returns<DuesCharge[]>(),
     supabase.from("profiles").select("id, full_name"),
+    supabase.from("role_permissions").select("*"),
   ]);
 
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = allowedKeys(profile!, permRows ?? []).has("manage_dues");
   // Admins can read everyone's rows, so narrow to their own for "Your dues".
   const mine = (charges ?? []).filter((c) => c.user_id === user!.id);
   const unpaid = mine.filter((c) => !c.paid_at);

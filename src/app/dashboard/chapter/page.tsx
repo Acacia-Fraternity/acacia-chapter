@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ChapterRecordForm } from "@/components/chapter-record-form";
 import { deleteNote, deleteChapterFile } from "./actions";
+import { allowedKeys } from "@/lib/permissions";
 import type { ChapterNote, ChapterFile, Profile } from "@/lib/types";
 
 type Tab = "chapter" | "exec";
@@ -22,18 +23,21 @@ export default async function ChapterPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: notes }, { data: files }, { data: profiles }] =
+  const [{ data: profile }, { data: notes }, { data: files }, { data: profiles }, { data: permRows }] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("id", user!.id).single<Profile>(),
       supabase.from("chapter_notes").select("*").returns<ChapterNote[]>(),
       supabase.from("chapter_files").select("*").returns<ChapterFile[]>(),
       supabase.from("profiles").select("id, full_name"),
+      supabase.from("role_permissions").select("*"),
     ]);
 
   // Exec (and admins) write records and see the Exec tab; the database
   // enforces both, so non-exec never receive exec rows at all.
-  const isExec = profile?.role === "admin" || !!profile?.is_exec;
-  const tab: Tab = isExec && tabParam === "exec" ? "exec" : "chapter";
+  const allowed = allowedKeys(profile!, permRows ?? []);
+  const canWrite = allowed.has("post_chapter_records");
+  const seesExec = allowed.has("view_exec_chapter");
+  const tab: Tab = seesExec && tabParam === "exec" ? "exec" : "chapter";
   const nameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name]));
 
   const tabNotes = (notes ?? [])
@@ -86,7 +90,7 @@ export default async function ChapterPage({
           ) : (
             <span className="text-xs text-muted-foreground">Unavailable</span>
           )}
-          {isExec && !file.note_id && (
+          {canWrite && !file.note_id && (
             <form action={deleteChapterFile.bind(null, file.id, file.storage_path)}>
               <button className="text-xs text-red-600 hover:underline">Delete</button>
             </form>
@@ -108,7 +112,7 @@ export default async function ChapterPage({
         >
           Chapter
         </Link>
-        {isExec && (
+        {seesExec && (
           <Link
             href="/dashboard/chapter?tab=exec"
             className={`rounded-full border px-3 py-1 text-xs font-medium ${
@@ -120,7 +124,7 @@ export default async function ChapterPage({
         )}
       </div>
 
-      {isExec && <ChapterRecordForm userId={user!.id} category={tab} folders={folderNames} />}
+      {canWrite && <ChapterRecordForm userId={user!.id} category={tab} folders={folderNames} />}
 
       {folderKeys.length === 0 && (
         <p className="text-sm text-muted-foreground">Nothing here yet.</p>
@@ -152,7 +156,7 @@ export default async function ChapterPage({
                           · posted by {nameById.get(note.created_by) ?? "Unknown"}
                         </p>
                       </div>
-                      {isExec && (
+                      {canWrite && (
                         <form action={deleteNote.bind(null, note.id)}>
                           <button className="text-xs text-red-600 hover:underline">Delete</button>
                         </form>

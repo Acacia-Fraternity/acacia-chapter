@@ -539,3 +539,11 @@ three different free-tier ownership models:
   the layout). Votes only via `submit_poll_vote()`; counts via `poll_counts()` so
   anonymous polls never expose who voted for what. Wine night events carry
   `events.sorority` (`src/lib/sororities.ts`); Sobers picker is wine night + party.
+- **Role access** (`role_permissions`, Admin page matrix): pledge / active / exec each get
+  a set of permissions (tabs, chat channels, actions). The catalog + defaults live in
+  `src/lib/permissions.ts` and must match the seed in schema.sql (seed never overwrites
+  admin edits). RLS policies and RPCs call `has_permission()`; admins bypass it. Tab
+  access is enforced by the dashboard layout (path via the `x-pathname` header set in
+  middleware.ts) and hidden in the sidebar. To add a permission: add it to the catalog,
+  add the seed rows, and hook it into a policy/page. A role comes from the profile flags
+  (`is_pledge` -> pledge, `is_exec` -> exec, else active).

@@ -52,11 +52,13 @@ export function GalleryView({
   events,
   currentUserId,
   isAdmin,
+  canUpload,
 }: {
   items: GalleryItem[];
   events: EventOption[];
   currentUserId: string;
   isAdmin: boolean;
+  canUpload: boolean;
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -166,12 +168,12 @@ export function GalleryView({
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-lg font-semibold">Gallery</h1>
-        <button
+        {canUpload && <button
           onClick={() => setShowUpload((v) => !v)}
           className="rounded-md bg-acacia-gold text-acacia-black px-3 py-1.5 text-sm font-semibold"
         >
           {showUpload ? "Cancel" : "Add photos"}
-        </button>
+        </button>}
       </div>
 
       {showUpload && (
