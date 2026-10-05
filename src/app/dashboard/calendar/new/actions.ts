@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { chapterWallTimeToIso } from "@/lib/chapter-time";
 import { EVENT_CATEGORIES, SOBER_CATEGORIES } from "@/lib/event-category";
+import { SORORITIES } from "@/lib/sororities";
 import type { EventCategory } from "@/lib/types";
 
 // Same for every event: close enough that the GPS check means "you are
@@ -33,6 +34,12 @@ export async function createEvent(formData: FormData) {
     category === "philanthropy"
       ? Math.max(0, Number(formData.get("hours") ?? 0) || 0)
       : 0;
+  const sororityRaw = String(formData.get("sorority") ?? "");
+  const sorority =
+    category === "wine_night" && (SORORITIES as readonly string[]).includes(sororityRaw)
+      ? sororityRaw
+      : "";
+  if (category === "wine_night" && !sorority) throw new Error("Choose a sorority for the wine night");
   const startsAt = String(formData.get("starts_at"));
   const endsAt = String(formData.get("ends_at"));
 
@@ -71,6 +78,7 @@ export async function createEvent(formData: FormData) {
     radius_meters: CHECK_IN_RADIUS_METERS,
     hours,
     category,
+    sorority,
     starts_at: chapterWallTimeToIso(startsAt),
     ends_at: chapterWallTimeToIso(endsAt),
     created_by: user.id,

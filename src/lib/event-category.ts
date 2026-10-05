@@ -6,10 +6,11 @@ export const EVENT_CATEGORIES: { value: EventCategory; label: string }[] = [
   { value: "philanthropy", label: "Philo event" },
   { value: "social", label: "Social event" },
   { value: "party", label: "Party" },
+  { value: "wine_night", label: "Wine night" },
 ];
 
-// Types that get the "Sober?" question.
-export const SOBER_CATEGORIES: EventCategory[] = ["social", "party"];
+// Types that get the "Sobers" picker.
+export const SOBER_CATEGORIES: EventCategory[] = ["wine_night", "party"];
 
 // "other" and "general_social" are legacy values still allowed by the
 // database (the imported calendar defaulted to "other"); they just aren't
@@ -30,6 +31,8 @@ export function categoryBadgeClass(category: EventCategory): string {
       return "bg-acacia-gold/25 text-acacia-black";
     case "party":
       return "bg-purple-500/20 text-purple-700";
+    case "wine_night":
+      return "bg-rose-500/20 text-rose-700";
     case "general_social":
       return "bg-orange-400/25 text-orange-700";
     default:

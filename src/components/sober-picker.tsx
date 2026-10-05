@@ -7,11 +7,9 @@ export interface PickerMember {
   name: string;
 }
 
-// "Sober?" Yes/No; Yes reveals a multi-select of brothers. Selected ids are
-// submitted as repeated `sober_ids` fields — and only while Yes is chosen,
-// so flipping back to No can't leave stale picks in the form.
+// "Sobers": a multi-select of brothers. Selected ids are submitted as
+// repeated `sober_ids` fields.
 export function SoberPicker({ members }: { members: PickerMember[] }) {
-  const [sober, setSober] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -37,29 +35,8 @@ export function SoberPicker({ members }: { members: PickerMember[] }) {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-3">
-        <span className="text-sm font-medium">Sober?</span>
-        {[
-          { label: "Yes", value: true },
-          { label: "No", value: false },
-        ].map((opt) => (
-          <button
-            key={opt.label}
-            type="button"
-            onClick={() => setSober(opt.value)}
-            className={`rounded-full border px-3 py-1 text-xs font-medium ${
-              sober === opt.value
-                ? "border-acacia-gold bg-acacia-gold/25"
-                : "border-surface-border"
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-
-      {sober && (
-        <div className="relative" ref={containerRef}>
+      <span className="block text-sm font-medium">Sobers</span>
+      <div className="relative" ref={containerRef}>
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
@@ -113,8 +90,7 @@ export function SoberPicker({ members }: { members: PickerMember[] }) {
           {selected.map((id) => (
             <input key={id} type="hidden" name="sober_ids" value={id} />
           ))}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

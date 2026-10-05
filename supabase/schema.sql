@@ -202,7 +202,7 @@ create table if not exists events (
   -- meeting/social that doesn't award anything.
   hours numeric not null default 0,
   category text not null default 'other'
-    check (category in ('chapter_meeting', 'philanthropy', 'social', 'party', 'general_social', 'other')),
+    check (category in ('chapter_meeting', 'philanthropy', 'social', 'party', 'wine_night', 'general_social', 'other')),
   starts_at timestamptz not null,
   ends_at timestamptz not null,
   created_by uuid not null references profiles (id),
@@ -215,7 +215,9 @@ create table if not exists events (
 alter table events add column if not exists category text not null default 'other';
 alter table events drop constraint if exists events_category_check;
 alter table events add constraint events_category_check
-  check (category in ('chapter_meeting', 'philanthropy', 'social', 'party', 'general_social', 'other'));
+  check (category in ('chapter_meeting', 'philanthropy', 'social', 'party', 'wine_night', 'general_social', 'other'));
+-- Which sorority a Wine night is with (empty for every other type).
+alter table events add column if not exists sorority text not null default '';
 
 -- "party" used to be folded into "social"; split out the events already
 -- named as parties (idempotent: only touches rows still marked social).

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { EVENT_CATEGORIES, SOBER_CATEGORIES } from "@/lib/event-category";
 import { SoberPicker, type PickerMember } from "@/components/sober-picker";
+import { SORORITIES } from "@/lib/sororities";
 import type { EventCategory } from "@/lib/types";
 
 const inputClass =
@@ -30,6 +31,22 @@ export function EventTypeFields({ members }: { members: PickerMember[] }) {
           ))}
         </select>
       </div>
+
+      {category === "wine_night" && (
+        <div>
+          <label className="block text-sm font-medium mb-1">Sorority</label>
+          <select name="sorority" required defaultValue="" className={inputClass}>
+            <option value="" disabled>
+              Choose a sorority…
+            </option>
+            {SORORITIES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {SOBER_CATEGORIES.includes(category) && <SoberPicker members={members} />}
 

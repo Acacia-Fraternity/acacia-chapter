@@ -246,9 +246,16 @@ export default async function EventsPage() {
                   </div>
                 </div>
 
+                {event.sorority && (
+                  <p className="text-sm">
+                    <span className="font-medium">Sorority:</span>{" "}
+                    <span className="text-muted">{event.sorority}</span>
+                  </p>
+                )}
+
                 {soberNames.length > 0 && (
                   <p className="text-sm">
-                    <span className="font-medium">Sober brothers:</span>{" "}
+                    <span className="font-medium">Sobers:</span>{" "}
                     <span className="text-muted">{soberNames.join(", ")}</span>
                   </p>
                 )}

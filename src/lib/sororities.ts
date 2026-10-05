@@ -1,0 +1,32 @@
+// Sororities at IU Bloomington: the 22 Panhellenic chapters (per
+// panhellenicindiana.org/chapters) plus the NPHC sororities. Offered when an
+// event is a Wine night.
+export const SORORITIES = [
+  "Alpha Chi Omega",
+  "Alpha Delta Pi",
+  "Alpha Epsilon Phi",
+  "Alpha Gamma Delta",
+  "Alpha Omicron Pi",
+  "Alpha Phi",
+  "Alpha Sigma Alpha",
+  "Alpha Xi Delta",
+  "Chi Omega",
+  "Delta Delta Delta",
+  "Delta Gamma",
+  "Delta Phi Epsilon",
+  "Delta Zeta",
+  "Gamma Phi Beta",
+  "Kappa Alpha Theta",
+  "Kappa Delta",
+  "Kappa Kappa Gamma",
+  "Phi Mu",
+  "Pi Beta Phi",
+  "Sigma Delta Tau",
+  "Sigma Kappa",
+  "Theta Phi Alpha",
+  "Zeta Tau Alpha",
+  "Alpha Kappa Alpha (NPHC)",
+  "Delta Sigma Theta (NPHC)",
+  "Sigma Gamma Rho (NPHC)",
+  "Zeta Phi Beta (NPHC)",
+] as const;

@@ -29,6 +29,7 @@ const BLOCK_CLASS: Record<Event["category"], string> = {
   social: "border-acacia-gold bg-acacia-gold/30",
   philanthropy: "border-acacia-green bg-acacia-green/25",
   party: "border-purple-500 bg-purple-500/25",
+  wine_night: "border-rose-500 bg-rose-500/25",
   general_social: "border-orange-400 bg-orange-400/25",
   other: "border-muted-foreground bg-surface-border",
 };
@@ -38,6 +39,7 @@ const STRIP_CLASS: Record<Event["category"], string> = {
   social: "bg-acacia-gold text-acacia-black",
   philanthropy: "bg-acacia-green text-white",
   party: "bg-purple-600 text-white",
+  wine_night: "bg-rose-600 text-white",
   general_social: "bg-orange-500 text-white",
   other: "bg-muted-foreground text-white",
 };
@@ -612,9 +614,15 @@ function EventDetail({
             : `${start.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })} · ${fmtTime(start)} – ${fmtTime(end)}`}
         </p>
         {event.address && <p className="text-sm text-muted">{event.address}</p>}
+        {event.sorority && (
+          <p className="text-sm">
+            <span className="font-medium">Sorority:</span>{" "}
+            <span className="text-muted">{event.sorority}</span>
+          </p>
+        )}
         {soberNames.length > 0 && (
           <p className="text-sm">
-            <span className="font-medium">Sober brothers:</span>{" "}
+            <span className="font-medium">Sobers:</span>{" "}
             <span className="text-muted">{soberNames.join(", ")}</span>
           </p>
         )}

@@ -17,6 +17,7 @@ export type EventCategory =
   | "philanthropy"
   | "social"
   | "party"
+  | "wine_night"
   | "general_social"
   | "other";
 
@@ -33,6 +34,7 @@ export interface Event {
   rsvp_required: boolean;
   rsvp_deadline: string | null;
   category: EventCategory;
+  sorority: string;
   starts_at: string;
   ends_at: string;
   created_by: string;
