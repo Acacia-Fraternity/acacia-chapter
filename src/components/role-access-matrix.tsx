@@ -40,7 +40,7 @@ export function RoleAccessMatrix({
     });
   }
 
-  const groups = ["Tabs", "Chat channels", "Actions"] as const;
+  const groups = Array.from(new Set(PERMISSIONS.map((p) => p.group)));
 
   return (
     <div className="space-y-3">

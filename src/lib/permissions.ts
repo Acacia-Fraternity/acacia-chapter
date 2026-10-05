@@ -54,6 +54,18 @@ export const PERMISSIONS: PermissionDef[] = [
   { key: "manage_any_parking", label: "Edit anyone's parking info", group: "House & parking", path: null, defaults: { pledge: false, active: false, exec: false } },
   { key: "pledgeship_schedule", label: "See the pledge schedule", group: "Pledgeship", path: null, defaults: { pledge: true, active: true, exec: true } },
   { key: "pledgeship_quizzes", label: "Use the pledge quizzes", group: "Pledgeship", path: null, defaults: { pledge: true, active: true, exec: true } },
+  { key: "calendar_view_day", label: "Calendar: Day view", group: "Events & calendar", path: null, defaults: { pledge: true, active: true, exec: true } },
+  { key: "calendar_view_week", label: "Calendar: Week view", group: "Events & calendar", path: null, defaults: { pledge: true, active: true, exec: true } },
+  { key: "calendar_view_month", label: "Calendar: Month view", group: "Events & calendar", path: null, defaults: { pledge: true, active: true, exec: true } },
+  { key: "chapter_main", label: "Chapter: Chapter subtab (records)", group: "Chapter", path: null, defaults: { pledge: true, active: true, exec: true } },
+  { key: "house_map", label: "House Presence: location map", group: "House & parking", path: null, defaults: { pledge: true, active: true, exec: true } },
+  { key: "house_range_day", label: "House Presence map: Last 24 hours", group: "House & parking", path: null, defaults: { pledge: true, active: true, exec: true } },
+  { key: "house_range_week", label: "House Presence map: Last 7 days", group: "House & parking", path: null, defaults: { pledge: true, active: true, exec: true } },
+  { key: "house_roster", label: "House Presence: member list", group: "House & parking", path: null, defaults: { pledge: true, active: true, exec: true } },
+  { key: "house_filter_all", label: "House Presence list: Everyone", group: "House & parking", path: null, defaults: { pledge: true, active: true, exec: true } },
+  { key: "house_filter_away", label: "House Presence list: Not at the house", group: "House & parking", path: null, defaults: { pledge: true, active: true, exec: true } },
+  { key: "house_filter_pledges", label: "House Presence list: Pledges", group: "House & parking", path: null, defaults: { pledge: true, active: true, exec: true } },
+  { key: "house_tracking_setup", label: "House Presence: always-on tracking setup", group: "House & parking", path: null, defaults: { pledge: true, active: true, exec: true } },
 ];
 
 export function roleOf(profile: { is_pledge: boolean; is_exec: boolean }): Role {

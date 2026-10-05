@@ -73,14 +73,29 @@ export default async function HousePresencePage({
   searchParams: Promise<{ filter?: string; range?: string }>;
 }) {
   const { filter: filterParam, range: rangeParam } = await searchParams;
-  const range: Range = rangeParam === "week" ? "week" : "day";
-  const filter: Filter =
-    filterParam === "away" || filterParam === "pledges" ? filterParam : "all";
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // Which subtabs this role may use decides the defaults for range/filter.
+  const [{ data: me }, { data: permRows }] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", user!.id).single<Profile>(),
+    supabase.from("role_permissions").select("*"),
+  ]);
+  const allowed = allowedKeys(me!, permRows ?? []);
+  const allowedRanges = (["day", "week"] as const).filter((r) => allowed.has(`house_range_${r}`));
+  const visibleFilters = FILTERS.filter((f) => allowed.has(`house_filter_${f.value}`));
+  const requestedRange: Range = rangeParam === "week" ? "week" : "day";
+  const range: Range = allowedRanges.includes(requestedRange)
+    ? requestedRange
+    : (allowedRanges[0] ?? "day");
+  const requestedFilter: Filter =
+    filterParam === "away" || filterParam === "pledges" ? filterParam : "all";
+  const filter: Filter = visibleFilters.some((f) => f.value === requestedFilter)
+    ? requestedFilter
+    : (visibleFilters[0]?.value ?? "all");
 
   const [
     { data: profile },
@@ -109,8 +124,7 @@ export default async function HousePresencePage({
   ]);
 
   const isAdmin = profile?.role === "admin";
-  const { data: permRows } = await supabase.from("role_permissions").select("*");
-  const seesAll = allowedKeys(profile!, permRows ?? []).has("view_all_locations");
+  const seesAll = allowed.has("view_all_locations");
   const now = new Date().getTime();
 
   const hoursByUserId = new Map<string, number>();
@@ -171,6 +185,7 @@ export default async function HousePresencePage({
         </p>
       </div>
 
+      {allowed.has("house_map") && (
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <h2 className="text-sm font-medium text-muted">
@@ -178,7 +193,7 @@ export default async function HousePresencePage({
             {seesAll ? "" : "(you — only certain roles see the whole chapter)"}
           </h2>
           <div className="flex gap-1.5">
-            {(["day", "week"] as const).map((r) => (
+            {allowedRanges.map((r) => (
               <Link
                 key={r}
                 href={`/dashboard/house-presence?range=${r}${filter === "all" ? "" : `&filter=${filter}`}`}
@@ -204,8 +219,12 @@ export default async function HousePresencePage({
         )}
       </div>
 
+      )}
+
+      {allowed.has("house_roster") && (
+        <>
       <div className="flex flex-wrap gap-2">
-        {FILTERS.map((f) => (
+        {visibleFilters.map((f) => (
           <Link
             key={f.value}
             href={
@@ -279,6 +298,10 @@ export default async function HousePresencePage({
         })}
       </ul>
 
+        </>
+      )}
+
+      {allowed.has("house_tracking_setup") && (
       <details className="rounded-lg border border-surface-border p-3 text-sm">
         <summary className="cursor-pointer font-medium">
           Set up always-on tracking on your phone
@@ -322,6 +345,7 @@ export default async function HousePresencePage({
           </form>
         </div>
       </details>
+      )}
     </div>
   );
 }

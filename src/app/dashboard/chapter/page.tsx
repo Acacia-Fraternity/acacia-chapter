@@ -37,7 +37,12 @@ export default async function ChapterPage({
   const allowed = allowedKeys(profile!, permRows ?? []);
   const canWrite = allowed.has("post_chapter_records");
   const seesExec = allowed.has("view_exec_chapter");
-  const tab: Tab = seesExec && tabParam === "exec" ? "exec" : "chapter";
+  const seesMain = allowed.has("chapter_main");
+  if (!seesMain && !seesExec) {
+    return <p className="text-sm text-muted">Your role doesn&apos;t have access to chapter records.</p>;
+  }
+  const tab: Tab =
+    seesExec && (tabParam === "exec" || !seesMain) ? "exec" : "chapter";
   const nameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name]));
 
   const tabNotes = (notes ?? [])
@@ -104,14 +109,16 @@ export default async function ChapterPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-lg font-semibold mr-2">Chapter</h1>
-        <Link
-          href="/dashboard/chapter"
-          className={`rounded-full border px-3 py-1 text-xs font-medium ${
-            tab === "chapter" ? "border-acacia-gold bg-acacia-gold/25" : "border-surface-border"
-          }`}
-        >
-          Chapter
-        </Link>
+        {seesMain && (
+          <Link
+            href="/dashboard/chapter"
+            className={`rounded-full border px-3 py-1 text-xs font-medium ${
+              tab === "chapter" ? "border-acacia-gold bg-acacia-gold/25" : "border-surface-border"
+            }`}
+          >
+            Chapter
+          </Link>
+        )}
         {seesExec && (
           <Link
             href="/dashboard/chapter?tab=exec"

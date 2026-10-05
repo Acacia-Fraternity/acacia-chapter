@@ -35,6 +35,9 @@ export default async function CalendarPage() {
       checkedInEventIds={(myCheckins ?? []).map((c) => c.event_id)}
       // Mirrors can_edit_calendar() in schema.sql, which is what actually enforces it.
       soberByEvent={soberByEvent}
+      allowedViews={(["day", "week", "month"] as const).filter((v) =>
+        allowedKeys(profile!, permRows ?? []).has(`calendar_view_${v}`),
+      )}
       canEdit={
         profile?.role === "admin" ||
         (profile?.can_edit_calendar ?? false) ||

@@ -137,13 +137,18 @@ export function CalendarView({
   checkedInEventIds,
   soberByEvent,
   canEdit,
+  allowedViews,
 }: {
   events: Event[];
   checkedInEventIds: string[];
   soberByEvent: Record<string, string[]>;
   canEdit: boolean;
+  allowedViews: View[];
 }) {
-  const [view, setView] = useState<View>("week");
+  const views = VIEWS.filter((v) => allowedViews.includes(v.id));
+  const [view, setView] = useState<View>(
+    allowedViews.includes("week") ? "week" : (allowedViews[0] ?? "week"),
+  );
   const [cursor, setCursor] = useState(() => startOfDay(new Date()));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
@@ -156,11 +161,11 @@ export function CalendarView({
   // where a single-day column shows real content immediately. Checked once
   // after mount (not during render) so the server and client HTML match.
   useEffect(() => {
-    if (window.innerWidth < 640) {
+    if (window.innerWidth < 640 && allowedViews.includes("day")) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setView("day");
     }
-  }, []);
+  }, [allowedViews]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60_000);
@@ -266,7 +271,7 @@ export function CalendarView({
         <h1 className="text-lg font-semibold">Calendar</h1>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <div className="flex rounded-md border border-surface-border overflow-hidden">
-            {VIEWS.map((v) => (
+            {views.map((v) => (
               <button
                 key={v.id}
                 onClick={() => {
@@ -323,7 +328,7 @@ export function CalendarView({
           onSelect={setSelectedId}
           onOpenDay={(d) => {
             setCursor(startOfDay(d));
-            setView("day");
+            if (allowedViews.includes("day")) setView("day");
           }}
         />
       ) : (
