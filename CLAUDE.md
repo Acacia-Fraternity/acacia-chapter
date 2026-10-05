@@ -363,6 +363,17 @@ What's actually built, given that ceiling:
 - Pages can go full-width by rendering a `data-wide` element (see
   `dashboard/layout.tsx`); the calendar does.
 
+## House Presence map (member_locations)
+
+`record_presence()` also writes a breadcrumb row to `member_locations`
+(when someone moves ~25 m or 5 min passes; pruned after 30 days). RLS: a
+member sees only their own trail, admins see everyone's — precise location
+history is deliberately not chapter-wide. `src/components/house-map.tsx`
+draws it with Leaflet + OpenStreetMap tiles (free; an embedded Google Map
+can't draw trails without a billed Maps JS API key). It re-fits the view only
+when the selected person changes, and the page refreshes every 60 s.
+`HOUSE_LOCATION` (702 E 3rd St) is the house marker/geofence circle.
+
 ## No public sign-up (admin-created accounts)
 
 There is no sign-up form. `/login` is sign-in only. Accounts are created

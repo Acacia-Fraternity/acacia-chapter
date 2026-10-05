@@ -3,10 +3,19 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { LivesInHouseToggle } from "@/components/lives-in-house-toggle";
 import { PresenceToggle } from "@/components/presence-toggle";
+import { HouseMap, type MapPoint } from "@/components/house-map";
+import { HOUSE_LOCATION } from "@/lib/house-location";
 import { rotateLocationToken } from "./actions";
 import type { Profile, HousePresenceSession } from "@/lib/types";
 
 type Filter = "all" | "away" | "pledges";
+type Range = "day" | "week";
+
+const RANGE_HOURS: Record<Range, number> = { day: 24, week: 24 * 7 };
+const MEMBER_COLORS = [
+  "#e11d48", "#2563eb", "#d97706", "#7c3aed", "#0891b2",
+  "#65a30d", "#db2777", "#ea580c", "#4f46e5", "#0d9488",
+];
 
 const FILTERS: { value: Filter; label: string }[] = [
   { value: "all", label: "Everyone" },
@@ -23,6 +32,31 @@ function startOfWeek(): Date {
   return start;
 }
 
+// PostgREST returns at most 1000 rows per request, so page through.
+async function fetchTrail(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  range: Range,
+) {
+  const since = new Date(Date.now() - RANGE_HOURS[range] * 3_600_000).toISOString();
+  const rows: {
+    user_id: string;
+    latitude: number;
+    longitude: number;
+    recorded_at: string;
+  }[] = [];
+  for (let from = 0; from < 10_000; from += 1000) {
+    const { data } = await supabase
+      .from("member_locations")
+      .select("user_id, latitude, longitude, recorded_at")
+      .gte("recorded_at", since)
+      .order("recorded_at", { ascending: true })
+      .range(from, from + 999);
+    rows.push(...(data ?? []));
+    if (!data || data.length < 1000) break;
+  }
+  return rows;
+}
+
 function timeAgo(iso: string, now: number): string {
   const minutes = Math.round((now - new Date(iso).getTime()) / 60000);
   if (minutes < 1) return "just now";
@@ -35,9 +69,10 @@ function timeAgo(iso: string, now: number): string {
 export default async function HousePresencePage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; range?: string }>;
 }) {
-  const { filter: filterParam } = await searchParams;
+  const { filter: filterParam, range: rangeParam } = await searchParams;
+  const range: Range = rangeParam === "week" ? "week" : "day";
   const filter: Filter =
     filterParam === "away" || filterParam === "pledges" ? filterParam : "all";
 
@@ -52,6 +87,7 @@ export default async function HousePresencePage({
     { data: sessions },
     { data: lastSessions },
     { data: token },
+    trailRows,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single<Profile>(),
     supabase.from("profiles").select("*").order("full_name").returns<Profile[]>(),
@@ -68,6 +104,7 @@ export default async function HousePresencePage({
       .limit(500)
       .returns<HousePresenceSession[]>(),
     supabase.rpc("get_or_create_location_token"),
+    fetchTrail(supabase, range),
   ]);
 
   const isAdmin = profile?.role === "admin";
@@ -91,6 +128,22 @@ export default async function HousePresencePage({
     }
   }
 
+  const colorById = new Map(
+    (members ?? []).map((m, i) => [m.id, MEMBER_COLORS[i % MEMBER_COLORS.length]]),
+  );
+  const mapMembers = (members ?? []).map((m) => ({
+    id: m.id,
+    name: m.full_name || "(no name)",
+    color: colorById.get(m.id)!,
+    isHome: currentlyHomeSet.has(m.id),
+  }));
+  const mapPoints: MapPoint[] = trailRows.map((r) => ({
+    user_id: r.user_id,
+    lat: r.latitude,
+    lng: r.longitude,
+    at: r.recorded_at,
+  }));
+
   const visibleMembers = (members ?? []).filter((m) => {
     if (filter === "away") return !currentlyHomeSet.has(m.id);
     if (filter === "pledges") return m.is_pledge;
@@ -113,6 +166,39 @@ export default async function HousePresencePage({
           (use &quot;I&apos;m home&quot;/&quot;I&apos;m leaving&quot; to cover
           the gaps).
         </p>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h2 className="text-sm font-medium text-muted">
+            Where everyone has been{" "}
+            {isAdmin ? "" : "(you — admins see the whole chapter)"}
+          </h2>
+          <div className="flex gap-1.5">
+            {(["day", "week"] as const).map((r) => (
+              <Link
+                key={r}
+                href={`/dashboard/house-presence?range=${r}${filter === "all" ? "" : `&filter=${filter}`}`}
+                className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                  range === r ? "border-acacia-gold bg-acacia-gold/25" : "border-surface-border"
+                }`}
+              >
+                {r === "day" ? "Last 24 hours" : "Last 7 days"}
+              </Link>
+            ))}
+          </div>
+        </div>
+        <HouseMap
+          house={HOUSE_LOCATION}
+          members={isAdmin ? mapMembers : mapMembers.filter((m) => m.id === user!.id)}
+          points={mapPoints}
+        />
+        {mapPoints.length === 0 && (
+          <p className="text-xs text-muted-foreground">
+            No location points yet in this window. Points appear once someone
+            sets up always-on tracking (below) or has the app open.
+          </p>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2">

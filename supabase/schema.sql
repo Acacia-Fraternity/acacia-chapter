@@ -788,6 +788,28 @@ create policy "presence sessions are viewable by any signed-in member"
 -- as checkins/messages: the geofence check can't be bypassed by calling
 -- the table directly.
 
+-- Breadcrumb trail for the House Presence map. One row per meaningful
+-- movement (see record_presence) rather than per ping, and pruned after 30
+-- days. Members see only their own trail; admins see everyone's — this is
+-- precise location history, so it is deliberately not chapter-wide.
+create table if not exists member_locations (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references profiles (id) on delete cascade,
+  latitude double precision not null,
+  longitude double precision not null,
+  recorded_at timestamptz not null default now()
+);
+
+create index if not exists member_locations_user_time
+  on member_locations (user_id, recorded_at desc);
+
+alter table member_locations enable row level security;
+
+drop policy if exists "members see their own trail, admins see all" on member_locations;
+create policy "members see their own trail, admins see all"
+  on member_locations for select to authenticated
+  using (auth.uid() = user_id or is_admin());
+
 -- Per-event time on site, fed by every location ping (browser or the
 -- always-on tracker app, see record_presence below). minutes_on_site only
 -- grows across pings that are close together, so leaving for two hours and
@@ -831,8 +853,22 @@ declare
   max_gap constant interval := interval '15 minutes';
   v_within boolean;
   v_row house_presence_sessions;
+  v_last member_locations;
 begin
   v_within := haversine_meters(p_lat, p_lng, house_lat, house_lng) <= house_radius;
+
+  -- Trail point: only when they've moved ~25 m or it's been 5 min, so a
+  -- phone sitting on a desk doesn't write a row every ping.
+  select * into v_last from member_locations
+  where user_id = p_user order by recorded_at desc limit 1;
+
+  if v_last.id is null
+     or now() - v_last.recorded_at > interval '5 minutes'
+     or haversine_meters(p_lat, p_lng, v_last.latitude, v_last.longitude) > 25 then
+    insert into member_locations (user_id, latitude, longitude) values (p_user, p_lat, p_lng);
+    delete from member_locations
+    where user_id = p_user and recorded_at < now() - interval '30 days';
+  end if;
 
   select * into v_row from house_presence_sessions
   where user_id = p_user and ended_at is null;
