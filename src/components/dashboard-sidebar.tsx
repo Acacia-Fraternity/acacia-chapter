@@ -16,6 +16,7 @@ import {
   PinOff,
 } from "lucide-react";
 import { AcaciaCrest } from "@/components/acacia-crest";
+import { TriangleIcon } from "@/components/triangle-icon";
 import { SignOutButton } from "@/components/sign-out-button";
 
 const NAV_LINKS = [
@@ -23,6 +24,7 @@ const NAV_LINKS = [
   { href: "/dashboard/calendar", label: "Calendar", icon: Calendar },
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
   { href: "/dashboard/chapter", label: "Chapter", icon: BookOpen },
+  { href: "/dashboard/curriculum", label: "Curriculum", icon: TriangleIcon },
   { href: "/dashboard/house-presence", label: "House Presence", icon: Home },
   { href: "/dashboard/parking", label: "Parking", icon: Car },
 ];
