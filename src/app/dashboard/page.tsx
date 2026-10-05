@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { formatChapterTime } from "@/lib/chapter-time";
 import { TaskList } from "@/components/task-list";
 import { categoryLabel, categoryBadgeClass } from "@/lib/event-category";
-import type { Profile, Task, Event } from "@/lib/types";
+import { daysUntil, formatMoney } from "@/lib/dues";
+import type { DuesCharge, Profile, Task, Event } from "@/lib/types";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -11,7 +12,14 @@ export default async function HomePage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: tasks }, { data: upcoming }] = await Promise.all([
+  const [{ data: dues }, { data: profile }, { data: tasks }, { data: upcoming }] = await Promise.all([
+    supabase
+      .from("dues_charges")
+      .select("*")
+      .eq("user_id", user!.id)
+      .is("paid_at", null)
+      .order("due_date", { ascending: true })
+      .returns<DuesCharge[]>(),
     supabase.from("profiles").select("*").eq("id", user!.id).single<Profile>(),
     supabase
       .from("tasks")
@@ -38,6 +46,25 @@ export default async function HomePage() {
         </h1>
         <p className="text-sm text-muted">Here&apos;s what&apos;s going on.</p>
       </div>
+
+      {(dues ?? [])
+        .filter((d) => daysUntil(d.due_date) <= 7)
+        .slice(0, 3)
+        .map((d) => {
+          const days = daysUntil(d.due_date);
+          return (
+            <Link
+              key={d.id}
+              href="/dashboard/dues"
+              className={`block rounded-lg border p-3 text-sm ${
+                days < 0 ? "border-red-600 text-red-600" : "border-amber-500"
+              }`}
+            >
+              <span className="font-semibold">{d.title}</span> · {formatMoney(d.amount_cents)} ·{" "}
+              {days < 0 ? `${-days} day${days === -1 ? "" : "s"} overdue` : days === 0 ? "due today" : `due in ${days} day${days === 1 ? "" : "s"}`}
+            </Link>
+          );
+        })}
 
       <section className="space-y-3">
         <h2 className="text-sm font-medium text-muted">Your to-do list</h2>

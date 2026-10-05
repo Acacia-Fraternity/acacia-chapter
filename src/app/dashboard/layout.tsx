@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardSidebar } from "@/components/dashboard-sidebar";
 import { PresenceTracker } from "@/components/presence-tracker";
+import { ScreenProtection } from "@/components/screen-protection";
 import type { Profile } from "@/lib/types";
 
 export default async function DashboardLayout({
@@ -25,9 +26,13 @@ export default async function DashboardLayout({
   return (
     <div className="flex flex-1">
       <PresenceTracker />
+      <ScreenProtection label={profile?.full_name || user.email || "member"} />
       <DashboardSidebar
         fullName={profile?.full_name ?? ""}
         isAdmin={profile?.role === "admin"}
+        seesGrades={
+          profile?.role === "admin" || !!profile?.is_pledge || !!profile?.on_pledge_committee
+        }
       />
       <main className="flex-1 min-w-0 px-4 sm:px-8 py-6">
         {/* A page can opt out of the reading-width cap by rendering a data-wide element (the calendar does). */}

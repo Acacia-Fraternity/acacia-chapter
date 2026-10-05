@@ -3,12 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import { ChatRoom } from "@/components/chat-room";
 import type { Profile } from "@/lib/types";
 
-type Channel = "active" | "exec" | "pledge";
+type Channel = "all" | "active" | "exec" | "pledge";
 
 const CHANNEL_LABEL: Record<Channel, string> = {
-  active: "Active members",
-  exec: "Exec announcements",
-  pledge: "Pledges",
+  all: "All members",
+  active: "Actives",
+  exec: "Exec",
+  pledge: "Pledge committee & pledges",
 };
 
 export default async function ChatPage({
@@ -31,14 +32,15 @@ export default async function ChatPage({
 
   const isAdmin = profile?.role === "admin";
   const isPledge = profile?.is_pledge ?? false;
+  const isExec = isAdmin || (profile?.is_exec ?? false);
+  const onCommittee = isAdmin || (profile?.on_pledge_committee ?? false);
 
   // Mirrors can_read_channel() in schema.sql — that function is what
   // actually enforces it; this just decides which tabs to show.
-  const channels: Channel[] = isAdmin
-    ? ["active", "exec", "pledge"]
-    : isPledge
-      ? ["pledge"]
-      : ["active", "exec"];
+  const channels: Channel[] = ["all"];
+  if (!isPledge || isAdmin) channels.push("active");
+  if (isExec) channels.push("exec");
+  if (isPledge || onCommittee) channels.push("pledge");
 
   const channel: Channel = channels.includes(channelParam as Channel)
     ? (channelParam as Channel)
@@ -46,7 +48,7 @@ export default async function ChatPage({
 
   const [{ data: profiles }, { data: messages }, { data: reactions }] =
     await Promise.all([
-      supabase.from("profiles").select("id, full_name, is_pledge"),
+      supabase.from("profiles").select("id, full_name, is_pledge, is_exec, role"),
       supabase
         .from("messages")
         .select("id, user_id, content, created_at, file_path, file_name")
@@ -56,9 +58,7 @@ export default async function ChatPage({
       supabase.from("message_reactions").select("id, message_id, user_id, emoji"),
     ]);
 
-  const audienceCount = (profiles ?? []).filter((p) => !p.is_pledge).length;
-  const canChat = profile?.can_chat ?? false;
-  const canPost = canChat && (channel !== "exec" || isAdmin);
+  const canPost = profile?.can_chat ?? false;
 
   return (
     <div className="flex flex-col h-[calc(100vh-6rem)]">
@@ -83,15 +83,9 @@ export default async function ChatPage({
         key={channel}
         channel={channel}
         currentUserId={user!.id}
-        isAdmin={isAdmin}
         canPost={canPost}
-        postBlockedReason={
-          channel === "exec" && !isAdmin
-            ? "Only the exec can post announcements — react to let them know you saw it."
-            : "You don't currently have permission to send messages. Ask an admin if you think this is wrong."
-        }
+        postBlockedReason="You don't currently have permission to send messages. Ask an admin if you think this is wrong."
         canReact={profile?.can_react ?? false}
-        audienceCount={audienceCount}
         profiles={profiles ?? []}
         initialMessages={messages ?? []}
         initialReactions={reactions ?? []}

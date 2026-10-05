@@ -7,6 +7,8 @@ export interface Profile {
   lives_in_house: boolean;
   is_pledge: boolean;
   can_edit_calendar: boolean;
+  is_exec: boolean;
+  on_pledge_committee: boolean;
   created_at: string;
 }
 
@@ -146,4 +148,36 @@ export interface EventFeedback {
   user_id: string;
   rating: number;
   comments: string;
+}
+
+export interface GalleryPhoto {
+  id: string;
+  user_id: string;
+  event_id: string | null;
+  album: string;
+  storage_path: string;
+  thumb_path: string;
+  width: number | null;
+  height: number | null;
+  created_at: string;
+}
+
+export interface DuesCharge {
+  id: string;
+  batch_id: string;
+  user_id: string;
+  title: string;
+  amount_cents: number;
+  due_date: string;
+  paid_at: string | null;
+  created_at: string;
+}
+
+export interface CanvasGrade {
+  user_id: string;
+  course_id: number;
+  course_name: string;
+  current_score: number | null;
+  current_grade: string | null;
+  synced_at: string;
 }

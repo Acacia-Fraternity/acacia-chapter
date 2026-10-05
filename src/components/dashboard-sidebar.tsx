@@ -11,6 +11,9 @@ import {
   Car,
   Home,
   Trophy,
+  Images,
+  Wallet,
+  GraduationCap,
   Palette,
   ShieldCheck,
   Pin,
@@ -24,8 +27,10 @@ const NAV_LINKS = [
   { href: "/dashboard/events", label: "Events", icon: CalendarCheck },
   { href: "/dashboard/calendar", label: "Calendar", icon: Calendar },
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
+  { href: "/dashboard/gallery", label: "Gallery", icon: Images },
+  { href: "/dashboard/dues", label: "Dues", icon: Wallet },
   { href: "/dashboard/chapter", label: "Chapter", icon: BookOpen },
-  { href: "/dashboard/curriculum", label: "Curriculum", icon: TriangleIcon },
+  { href: "/dashboard/pledgeship", label: "Pledgeship", icon: TriangleIcon },
   { href: "/dashboard/house-points", label: "House Points", icon: Trophy },
   { href: "/dashboard/house-presence", label: "House Presence", icon: Home },
   { href: "/dashboard/parking", label: "Parking", icon: Car },
@@ -36,9 +41,11 @@ const STORAGE_KEY = "acacia-sidebar-pinned";
 export function DashboardSidebar({
   fullName,
   isAdmin,
+  seesGrades,
 }: {
   fullName: string;
   isAdmin: boolean;
+  seesGrades: boolean;
 }) {
   const pathname = usePathname();
   // "Pinned" keeps it expanded permanently. Not pinned (the default): it
@@ -71,9 +78,13 @@ export function DashboardSidebar({
     });
   }
 
-  const links = isAdmin
-    ? [...NAV_LINKS, { href: "/dashboard/admin", label: "Admin", icon: ShieldCheck }]
-    : NAV_LINKS;
+  const links = [
+    ...NAV_LINKS,
+    ...(seesGrades
+      ? [{ href: "/dashboard/grades", label: "Grades", icon: GraduationCap }]
+      : []),
+    ...(isAdmin ? [{ href: "/dashboard/admin", label: "Admin", icon: ShieldCheck }] : []),
+  ];
 
   const expanded = pinned || hovering;
   const widthClass = expanded ? "w-16 sm:w-56" : "w-16";

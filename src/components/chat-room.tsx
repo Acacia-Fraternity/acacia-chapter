@@ -26,23 +26,25 @@ const MAX_FILE_BYTES = 20 * 1024 * 1024;
 export function ChatRoom({
   channel,
   currentUserId,
-  isAdmin,
   canPost,
   postBlockedReason,
   canReact,
-  audienceCount,
   profiles,
   initialMessages,
   initialReactions,
 }: {
-  channel: "active" | "exec" | "pledge";
+  channel: "all" | "active" | "exec" | "pledge";
   currentUserId: string;
-  isAdmin: boolean;
   canPost: boolean;
   postBlockedReason: string;
   canReact: boolean;
-  audienceCount: number;
-  profiles: { id: string; full_name: string }[];
+  profiles: {
+    id: string;
+    full_name: string;
+    is_pledge: boolean;
+    is_exec: boolean;
+    role: string;
+  }[];
   initialMessages: ChatMessage[];
   initialReactions: ChatReaction[];
 }) {
@@ -55,6 +57,15 @@ export function ChatRoom({
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const tagById = useMemo(() => {
+    const map = new Map<string, string>();
+    profiles.forEach((p) => {
+      if (p.is_pledge) map.set(p.id, "Pledge");
+      else if (p.is_exec || p.role === "admin") map.set(p.id, "Exec");
+    });
+    return map;
+  }, [profiles]);
 
   const nameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -203,18 +214,12 @@ export function ChatRoom({
     return Array.from(byEmoji.entries());
   }
 
-  function reactedCount(messageId: string) {
-    return new Set(
-      reactions.filter((r) => r.message_id === messageId).map((r) => r.user_id),
-    ).size;
-  }
-
   return (
     <>
       <div className="flex-1 overflow-y-auto space-y-3 pr-1">
         {messages.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            {channel === "exec" ? "No announcements yet." : "No messages yet."}
+            No messages yet.
           </p>
         )}
 
@@ -234,6 +239,11 @@ export function ChatRoom({
                 {!isMe && (
                   <p className="text-xs font-semibold text-acacia-gold mb-0.5">
                     {nameById.get(message.user_id) ?? "Unknown"}
+                    {tagById.get(message.user_id) && (
+                      <span className="ml-1.5 rounded bg-acacia-black/10 px-1 text-[10px] font-medium uppercase tracking-wide text-acacia-black">
+                        {tagById.get(message.user_id)}
+                      </span>
+                    )}
                   </p>
                 )}
                 {message.content && (
@@ -288,11 +298,6 @@ export function ChatRoom({
                   </div>
                 )}
 
-                {channel === "exec" && isAdmin && (
-                  <span className="text-xs text-muted-foreground ml-1">
-                    {reactedCount(message.id)} of {audienceCount} reacted
-                  </span>
-                )}
               </div>
             </div>
           );
@@ -337,10 +342,12 @@ export function ChatRoom({
               onChange={(e) => setDraft(e.target.value)}
               placeholder={
                 channel === "exec"
-                  ? "Post an announcement…"
+                  ? "Message the exec…"
                   : channel === "pledge"
-                    ? "Message the pledges…"
-                    : "Message the chapter…"
+                    ? "Message the pledge chat…"
+                    : channel === "active"
+                      ? "Message the actives…"
+                      : "Message everyone…"
               }
               className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
             />

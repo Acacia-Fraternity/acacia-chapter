@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Map as LeafletMap, LayerGroup } from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { PLACES } from "@/lib/places";
 
 export interface MapMember {
   id: string;
@@ -105,6 +106,18 @@ export function HouseMap({
     })
       .bindTooltip("Acacia house · 702 E 3rd St", { direction: "top", offset: [0, -14] })
       .addTo(layer);
+
+    for (const place of PLACES) {
+      L.circleMarker([place.lat, place.lng], {
+        radius: 6,
+        color: "#ffffff",
+        weight: 1.5,
+        fillColor: place.kind === "recreation" ? "#d97706" : "#003d4c",
+        fillOpacity: 0.9,
+      })
+        .bindTooltip(place.name, { direction: "top" })
+        .addTo(layer);
+    }
 
     for (const member of members) {
       if (selectedId && member.id !== selectedId) continue;

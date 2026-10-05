@@ -501,3 +501,34 @@ three different free-tier ownership models:
 - Match surrounding style; this is a small single-chapter app, not a
   library — prefer the direct, obvious implementation over an abstraction
   built for hypothetical future chapters.
+
+## Exec status, chat channels, Gallery, Dues, Grades, Pledgeship
+
+- **Member status**: pledge (`is_pledge`) / active / exec (`is_exec`; `role='admin'`
+  counts as exec via `is_exec()`). `on_pledge_committee` is separate. All four
+  flags are admin-only in the privilege trigger.
+- **Chat channels** (`messages.channel`): `all` (everyone), `active` (non-pledges),
+  `exec` (exec + admins, a normal chat now — it used to be admin-only
+  announcements), `pledge` (pledges + committee + admins). Read rules live in
+  `can_read_channel()`; `send_message()` only checks `can_chat` + readability.
+- **Screenshots can't truly be blocked on the web.** `screen-protection.tsx`
+  (mounted in the dashboard layout) blanks the app on window blur / screenshot
+  shortcuts and overlays the viewer's name as a watermark; globals.css blocks
+  select/print. Phones expose no screenshot signal to web apps — real blocking
+  needs a native app (Android FLAG_SECURE).
+- **Gallery**: private `gallery` bucket, browser resizes to a 2000px full + 480px
+  thumb before upload; grid groups by album (event name or free text).
+- **Dues**: `dues_charges` (admin-managed, members read their own). Payment is
+  recorded by hand. `/api/cron/reminders` pushes at 7 days / 1 day / due date /
+  weekly while overdue (9am-8pm chapter time only), deduped by `dues_reminder_log`.
+- **Canvas grades**: pledges paste a personal Canvas access token on the Grades
+  page; stored in `canvas_connections` (service role only), copied to
+  `canvas_grades` (visible to the pledge + committee/admins). Host is fixed to
+  `CANVAS_BASE_URL` (default iu.instructure.com) so tokens can't be sent elsewhere.
+  The reminders cron refreshes stale connections. Works only if IU lets students
+  create access tokens.
+- **Pledgeship** (`/dashboard/pledgeship`, was Curriculum): Schedule subtab renders
+  `src/lib/pledgeship.ts` (transcribed from the Fall 2026 schedule .docx); Quizzes
+  subtab is the old curriculum quiz. `/dashboard/curriculum` redirects.
+- **Places** (`src/lib/places.ts`): SRSC + IU residence halls — quick-pick in the
+  event location picker and markers on the House Presence map.

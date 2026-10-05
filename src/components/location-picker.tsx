@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { searchAddresses, type AddressSuggestion } from "@/lib/geocode";
 import { HOUSE_LOCATION } from "@/lib/house-location";
+import { PLACES } from "@/lib/places";
 
 const DEBOUNCE_MS = 350;
 
@@ -85,6 +86,27 @@ export function LocationPicker() {
   return (
     <div className="space-y-2">
       <label className="block text-sm font-medium">Location</label>
+
+      <select
+        value=""
+        onChange={(e) => {
+          const place = PLACES.find((p) => p.name === e.target.value);
+          if (!place) return;
+          const label = `${place.name}, Bloomington, IN`;
+          setChosen({ label, lat: place.lat, lng: place.lng });
+          setQuery(label);
+          setSuggestions([]);
+          setError(null);
+        }}
+        className="w-full rounded-md border border-surface-border bg-surface px-3 py-2 text-sm"
+      >
+        <option value="">Quick pick: SRSC or an IU residence hall…</option>
+        {PLACES.map((p) => (
+          <option key={p.name} value={p.name}>
+            {p.name}
+          </option>
+        ))}
+      </select>
 
       <div className="relative">
         <input

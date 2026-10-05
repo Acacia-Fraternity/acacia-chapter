@@ -72,3 +72,25 @@ option {
   background-color: var(--surface);
   color: var(--foreground);
 }
+
+/* Deterrents for screenshots/copying (see components/screen-protection.tsx).
+   Inputs stay selectable — Safari makes user-select:none inputs untypeable. */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+input,
+textarea,
+[contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+img {
+  -webkit-user-drag: none;
+}
+@media print {
+  body {
+    display: none !important;
+  }
+}

@@ -7,6 +7,8 @@ import {
   setMemberCanReact,
   setMemberIsPledge,
   setMemberCanEditCalendar,
+  setMemberIsExec,
+  setMemberOnPledgeCommittee,
 } from "@/app/dashboard/admin/actions";
 import type { Profile } from "@/lib/types";
 
@@ -91,6 +93,30 @@ export function MemberPermissionsRow({
               }
             />
             Pledge
+          </label>
+
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={member.is_exec}
+              disabled={isPending}
+              onChange={(e) =>
+                run(() => setMemberIsExec(member.id, e.target.checked))
+              }
+            />
+            Exec
+          </label>
+
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={member.on_pledge_committee}
+              disabled={isPending}
+              onChange={(e) =>
+                run(() => setMemberOnPledgeCommittee(member.id, e.target.checked))
+              }
+            />
+            Pledge cmte
           </label>
 
           <select

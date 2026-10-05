@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import webpush from "web-push";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { CHAPTER_TZ } from "@/lib/chapter-time";
+import { chapterToday, daysUntil, formatMoney } from "@/lib/dues";
+import { recordCanvasError, syncCanvasGrades } from "@/lib/canvas";
 
 // Called every ~5 minutes by .github/workflows/reminders.yml. Sends a push
 // for each (member, event, lead time) that is due and hasn't been sent.
@@ -26,6 +30,117 @@ function untilText(minutes: number): string {
   if (minutes >= 60) return "in about an hour";
   if (minutes <= 1) return "now";
   return `in ${Math.round(minutes)} minutes`;
+}
+
+async function pushToAll(
+  admin: SupabaseClient,
+  pref: Prefs,
+  payload: string,
+): Promise<number> {
+  let sent = 0;
+  const alive: webpush.PushSubscription[] = [];
+  for (const sub of pref.push_subscriptions) {
+    try {
+      await webpush.sendNotification(sub, payload);
+      alive.push(sub);
+      sent += 1;
+    } catch (err) {
+      const status = (err as { statusCode?: number }).statusCode;
+      // 404/410: the browser dropped this subscription — stop trying it.
+      if (status !== 404 && status !== 410) alive.push(sub);
+    }
+  }
+  if (alive.length !== pref.push_subscriptions.length) {
+    await admin
+      .from("notification_prefs")
+      .update({ push_subscriptions: alive })
+      .eq("user_id", pref.user_id);
+  }
+  return sent;
+}
+
+// A reminder "stage" is how far the due date is: a week out, the day before,
+// the day itself, then weekly while overdue. Only the current stage is sent,
+// and the log makes each stage fire once per charge.
+function duesStage(days: number): string | null {
+  if (days < 0) return `late_${Math.floor((-days - 1) / 7)}`;
+  if (days === 0) return "due";
+  if (days <= 1) return "d1";
+  if (days <= 7) return "d7";
+  return null;
+}
+
+function duesBody(title: string, amount: number, days: number): string {
+  const money = formatMoney(amount);
+  if (days < 0) return `${title} (${money}) is ${-days} day${days === -1 ? "" : "s"} overdue.`;
+  if (days === 0) return `${title} (${money}) is due today.`;
+  return `${title} (${money}) is due in ${days} day${days === 1 ? "" : "s"}.`;
+}
+
+async function sendDuesReminders(admin: SupabaseClient, prefs: Prefs[]): Promise<number> {
+  // Don't buzz anyone's phone overnight.
+  const hour = Number(
+    new Intl.DateTimeFormat("en-US", { timeZone: CHAPTER_TZ, hour: "numeric", hourCycle: "h23" }).format(new Date()),
+  );
+  if (hour < 9 || hour >= 20) return 0;
+
+  const { data: charges } = await admin
+    .from("dues_charges")
+    .select("id, user_id, title, amount_cents, due_date")
+    .is("paid_at", null);
+  if (!charges?.length) return 0;
+
+  const prefByUser = new Map(prefs.map((p) => [p.user_id, p]));
+  const today = chapterToday();
+  let sent = 0;
+
+  for (const charge of charges) {
+    const pref = prefByUser.get(charge.user_id);
+    if (!pref) continue;
+    const days = daysUntil(charge.due_date, today);
+    const stage = duesStage(days);
+    if (!stage) continue;
+
+    const { error } = await admin.from("dues_reminder_log").insert({ charge_id: charge.id, stage });
+    if (error) {
+      if (error.code === "23505") continue;
+      throw new Error(error.message);
+    }
+
+    sent += await pushToAll(
+      admin,
+      pref,
+      JSON.stringify({
+        title: "Dues reminder",
+        body: duesBody(charge.title, charge.amount_cents, days),
+        url: "/dashboard/dues",
+      }),
+    );
+  }
+  return sent;
+}
+
+// Keeps pledges' Canvas grades reasonably fresh without hammering Canvas:
+// a few connections per run, only those not synced in the last 6 hours.
+async function refreshStaleCanvas(admin: SupabaseClient): Promise<void> {
+  const cutoff = new Date(Date.now() - 6 * 3600_000).toISOString();
+  const { data } = await admin
+    .from("canvas_connections")
+    .select("user_id, access_token")
+    .or(`last_synced_at.is.null,last_synced_at.lt.${cutoff}`)
+    .limit(5);
+  for (const c of data ?? []) {
+    try {
+      await syncCanvasGrades(admin, c.user_id, c.access_token);
+    } catch (err) {
+      await recordCanvasError(admin, c.user_id, err instanceof Error ? err.message : "Sync failed");
+      // Push last_synced_at forward so a dead token isn't retried every run.
+      await admin
+        .from("canvas_connections")
+        .update({ last_synced_at: new Date().toISOString() })
+        .eq("user_id", c.user_id);
+    }
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -55,7 +170,11 @@ export async function GET(request: NextRequest) {
   ]);
 
   const prefs = (allPrefs ?? []).filter((p) => p.push_subscriptions.length > 0);
-  if (!events?.length || prefs.length === 0) return NextResponse.json({ sent: 0 });
+
+  let sent = 0;
+  if (prefs.length > 0) sent += await sendDuesReminders(admin, prefs);
+  await refreshStaleCanvas(admin);
+  if (!events?.length || prefs.length === 0) return NextResponse.json({ sent });
 
   const eventIds = events.map((e) => e.id);
   const { data: declined } = await admin
@@ -65,7 +184,6 @@ export async function GET(request: NextRequest) {
     .eq("status", "not_going");
   const declinedKeys = new Set((declined ?? []).map((r) => `${r.event_id}:${r.user_id}`));
 
-  let sent = 0;
   for (const event of events) {
     const minutesUntil = (new Date(event.starts_at).getTime() - now) / 60_000;
 
@@ -97,24 +215,7 @@ export async function GET(request: NextRequest) {
         url: "/dashboard/events",
       });
 
-      const alive: webpush.PushSubscription[] = [];
-      for (const sub of pref.push_subscriptions) {
-        try {
-          await webpush.sendNotification(sub, payload);
-          alive.push(sub);
-          sent += 1;
-        } catch (err) {
-          const status = (err as { statusCode?: number }).statusCode;
-          // 404/410: the browser dropped this subscription — stop trying it.
-          if (status !== 404 && status !== 410) alive.push(sub);
-        }
-      }
-      if (alive.length !== pref.push_subscriptions.length) {
-        await admin
-          .from("notification_prefs")
-          .update({ push_subscriptions: alive })
-          .eq("user_id", pref.user_id);
-      }
+      sent += await pushToAll(admin, pref, payload);
     }
   }
 

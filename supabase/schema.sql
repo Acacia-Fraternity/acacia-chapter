@@ -33,6 +33,12 @@ alter table profiles add column if not exists is_pledge boolean not null default
 -- Lets a non-admin (e.g. the chapter president) add/edit/delete calendar
 -- events without being granted full admin. Admin-controlled like role.
 alter table profiles add column if not exists can_edit_calendar boolean not null default false;
+-- Third member status next to pledge / active: Exec officers. `role = 'admin'`
+-- still counts as exec everywhere (see is_exec()). Admin-controlled.
+alter table profiles add column if not exists is_exec boolean not null default false;
+-- Runs the pledge program: reads the pledge chat and sees pledge Canvas
+-- grades. Admin-controlled.
+alter table profiles add column if not exists on_pledge_committee boolean not null default false;
 
 alter table profiles enable row level security;
 
@@ -80,6 +86,30 @@ as $$
   );
 $$;
 
+create or replace function is_exec()
+returns boolean
+language sql
+security definer set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from profiles
+    where id = auth.uid() and (role = 'admin' or is_exec)
+  );
+$$;
+
+create or replace function on_pledge_committee()
+returns boolean
+language sql
+security definer set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from profiles
+    where id = auth.uid() and (role = 'admin' or on_pledge_committee)
+  );
+$$;
+
 drop policy if exists "profiles are viewable by any signed-in member" on profiles;
 create policy "profiles are viewable by any signed-in member"
   on profiles for select
@@ -119,8 +149,10 @@ begin
     or new.can_react is distinct from old.can_react
     or new.is_pledge is distinct from old.is_pledge
     or new.can_edit_calendar is distinct from old.can_edit_calendar
+    or new.is_exec is distinct from old.is_exec
+    or new.on_pledge_committee is distinct from old.on_pledge_committee
   ) then
-    raise exception 'Only an admin can change role, chat/react/calendar permissions, or pledge status';
+    raise exception 'Only an admin can change role, chat/react/calendar permissions, or pledge/exec/committee status';
   end if;
   return new;
 end;
@@ -416,17 +448,17 @@ create table if not exists messages (
   created_at timestamptz not null default now()
 );
 
--- Three rooms share this table, split by `channel`:
---   active — every non-pledge brother talks
---   exec   — announcements: only admins post, brothers read and react (the
---            reactions are how the exec sees how an announcement landed)
---   pledge — pledges (and admins) only
+-- Four rooms share this table, split by `channel`:
+--   all    — everyone: pledges, actives, exec
+--   active — every non-pledge brother
+--   exec   — exec officers (and admins) only
+--   pledge — pledges, the pledge committee, and admins
 -- `create table if not exists` is a no-op on the live table, so the new
 -- columns need explicit ALTERs.
 alter table messages add column if not exists channel text not null default 'active';
 alter table messages drop constraint if exists messages_channel_check;
 alter table messages add constraint messages_channel_check
-  check (channel in ('active', 'exec', 'pledge'));
+  check (channel in ('all', 'active', 'exec', 'pledge'));
 alter table messages add column if not exists file_path text;
 alter table messages add column if not exists file_name text;
 -- Original check required 1+ chars; a message that is only an attachment
@@ -446,7 +478,10 @@ stable
 as $$
   select case
     when is_admin() then true
-    when p_channel = 'pledge' then coalesce((select is_pledge from profiles where id = auth.uid()), false)
+    when p_channel = 'all' then exists (select 1 from profiles where id = auth.uid())
+    when p_channel = 'exec' then coalesce((select is_exec from profiles where id = auth.uid()), false)
+    when p_channel = 'pledge' then coalesce(
+      (select is_pledge or on_pledge_committee from profiles where id = auth.uid()), false)
     else not coalesce((select is_pledge from profiles where id = auth.uid()), true)
   end;
 $$;
@@ -485,10 +520,6 @@ begin
 
   if not can_read_channel(p_channel) then
     raise exception 'You are not in this chat';
-  end if;
-
-  if p_channel = 'exec' and not is_admin() then
-    raise exception 'Only the exec can post announcements';
   end if;
 
   -- Attachments are uploaded by the browser straight to Storage under the
@@ -1329,6 +1360,141 @@ drop policy if exists "calendar editors manage assignments" on event_assignments
 create policy "calendar editors manage assignments"
   on event_assignments for all to authenticated
   using (can_edit_calendar()) with check (can_edit_calendar());
+
+-- ============================================================
+-- Gallery — photos from parties and socials. Both the full image and a
+-- small thumbnail are uploaded by the browser (already resized) to the
+-- private `gallery` bucket under <uploader id>/. Any member may add; an
+-- uploader (or an admin) may remove.
+-- ============================================================
+create table if not exists gallery_photos (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references profiles (id) on delete cascade,
+  event_id uuid references events (id) on delete set null,
+  album text not null default '',
+  storage_path text not null,
+  thumb_path text not null,
+  width integer,
+  height integer,
+  created_at timestamptz not null default now()
+);
+
+alter table gallery_photos enable row level security;
+
+drop policy if exists "gallery photos are viewable by any signed-in member" on gallery_photos;
+create policy "gallery photos are viewable by any signed-in member"
+  on gallery_photos for select to authenticated using (true);
+
+drop policy if exists "members add photos under their own folder" on gallery_photos;
+create policy "members add photos under their own folder"
+  on gallery_photos for insert to authenticated
+  with check (
+    user_id = auth.uid()
+    and split_part(storage_path, '/', 1) = auth.uid()::text
+    and split_part(thumb_path, '/', 1) = auth.uid()::text
+  );
+
+drop policy if exists "uploaders and admins delete photos" on gallery_photos;
+create policy "uploaders and admins delete photos"
+  on gallery_photos for delete to authenticated
+  using (user_id = auth.uid() or is_admin());
+
+insert into storage.buckets (id, name, public)
+values ('gallery', 'gallery', false)
+on conflict (id) do nothing;
+
+drop policy if exists "gallery: members upload to their own folder" on storage.objects;
+create policy "gallery: members upload to their own folder"
+  on storage.objects for insert to authenticated
+  with check (bucket_id = 'gallery' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "gallery: members read" on storage.objects;
+create policy "gallery: members read"
+  on storage.objects for select to authenticated
+  using (bucket_id = 'gallery');
+
+drop policy if exists "gallery: uploaders and admins delete" on storage.objects;
+create policy "gallery: uploaders and admins delete"
+  on storage.objects for delete to authenticated
+  using (bucket_id = 'gallery' and ((storage.foldername(name))[1] = auth.uid()::text or public.is_admin()));
+
+-- ============================================================
+-- Dues — one row per member per charge. Members see only their own; admins
+-- (the treasurer) see and manage everyone's. `batch_id` groups the rows
+-- created together so the admin screen can show one charge with N members.
+-- Payment is recorded by hand (paid_at) — there is no payment processing.
+-- ============================================================
+create table if not exists dues_charges (
+  id uuid primary key default gen_random_uuid(),
+  batch_id uuid not null,
+  user_id uuid not null references profiles (id) on delete cascade,
+  title text not null check (char_length(trim(title)) between 1 and 120),
+  amount_cents integer not null check (amount_cents > 0),
+  due_date date not null,
+  paid_at timestamptz,
+  created_by uuid references profiles (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+alter table dues_charges enable row level security;
+
+drop policy if exists "members see their own dues, admins see all" on dues_charges;
+create policy "members see their own dues, admins see all"
+  on dues_charges for select to authenticated
+  using (user_id = auth.uid() or is_admin());
+
+drop policy if exists "admins manage dues" on dues_charges;
+create policy "admins manage dues"
+  on dues_charges for all to authenticated
+  using (is_admin()) with check (is_admin());
+
+-- Which reminder stages have already been pushed (cron route, service role).
+create table if not exists dues_reminder_log (
+  charge_id uuid not null references dues_charges (id) on delete cascade,
+  stage text not null,
+  sent_at timestamptz not null default now(),
+  primary key (charge_id, stage)
+);
+alter table dues_reminder_log enable row level security;
+
+-- ============================================================
+-- Canvas — a pledge connects their own Canvas by pasting a personal access
+-- token (Canvas > Account > Settings > New Access Token). The token is only
+-- ever read/written with the service role (RLS on, no policies, same idea as
+-- location_tokens); grades are copied into canvas_grades, which the pledge
+-- and the pledge committee/admins can read.
+-- ============================================================
+create table if not exists canvas_connections (
+  user_id uuid primary key references profiles (id) on delete cascade,
+  access_token text not null,
+  connected_at timestamptz not null default now(),
+  last_synced_at timestamptz,
+  last_error text
+);
+alter table canvas_connections enable row level security;
+
+create table if not exists canvas_grades (
+  user_id uuid not null references profiles (id) on delete cascade,
+  course_id bigint not null,
+  course_name text not null,
+  current_score numeric,
+  current_grade text,
+  synced_at timestamptz not null default now(),
+  primary key (user_id, course_id)
+);
+
+alter table canvas_grades enable row level security;
+
+drop policy if exists "pledges see own grades, committee sees pledge grades" on canvas_grades;
+create policy "pledges see own grades, committee sees pledge grades"
+  on canvas_grades for select to authenticated
+  using (
+    user_id = auth.uid()
+    or (
+      on_pledge_committee()
+      and exists (select 1 from profiles p where p.id = canvas_grades.user_id and p.is_pledge)
+    )
+  );
 
 -- ============================================================
 -- Bootstrap the first admin. Run this SEPARATELY, once, after you've
