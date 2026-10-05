@@ -145,6 +145,8 @@ export async function GET(request: NextRequest) {
     admin.from("notification_prefs").select("*").returns<Prefs[]>(),
   ]);
 
+  await admin.rpc("spawn_due_polls");
+
   const prefs = (allPrefs ?? []).filter((p) => p.push_subscriptions.length > 0);
 
   let sent = 0;

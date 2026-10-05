@@ -1640,6 +1640,91 @@ $$;
 grant execute on function poll_counts(uuid) to authenticated;
 
 -- ============================================================
+-- Recurring polls — a schedule that spawns a normal `polls` row each time it
+-- comes due. spawn_due_polls() is called from the dashboard layout (so it
+-- works with no scheduler) and from the reminders cron; it is idempotent and
+-- takes a row lock, so concurrent callers can't double-create. If runs were
+-- missed (nobody opened the app), it creates ONE poll and moves on rather than
+-- flooding. Repeats keep the same Bloomington wall-clock time across DST.
+-- ============================================================
+create table if not exists poll_schedules (
+  id uuid primary key default gen_random_uuid(),
+  question text not null check (char_length(trim(question)) between 1 and 300),
+  options jsonb not null,
+  allow_multiple boolean not null default false,
+  anonymous boolean not null default true,
+  required boolean not null default false,
+  audience text not null default 'everyone'
+    check (audience in ('everyone', 'actives', 'pledges', 'exec')),
+  frequency text not null check (frequency in ('weekly', 'biweekly', 'monthly')),
+  next_run_at timestamptz not null,
+  -- How long each poll stays open; null = until an exec closes it.
+  open_hours integer check (open_hours is null or open_hours > 0),
+  -- Close the previous poll from this schedule when the next one goes out.
+  close_previous boolean not null default true,
+  active boolean not null default true,
+  created_by uuid references profiles (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+alter table poll_schedules enable row level security;
+
+drop policy if exists "exec manage poll schedules" on poll_schedules;
+create policy "exec manage poll schedules"
+  on poll_schedules for all to authenticated
+  using (is_exec()) with check (is_exec());
+
+alter table polls add column if not exists schedule_id uuid references poll_schedules (id) on delete set null;
+
+create or replace function spawn_due_polls()
+returns integer
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  s poll_schedules;
+  v_tz constant text := 'America/Indiana/Indianapolis';
+  v_step interval;
+  v_made integer := 0;
+begin
+  for s in
+    select * from poll_schedules
+    where active and next_run_at <= now()
+    for update skip locked
+  loop
+    if s.close_previous then
+      update polls set closed = true where schedule_id = s.id and not closed;
+    end if;
+
+    insert into polls (
+      question, options, allow_multiple, anonymous, required, audience,
+      closes_at, created_by, schedule_id
+    ) values (
+      s.question, s.options, s.allow_multiple, s.anonymous, s.required, s.audience,
+      case when s.open_hours is null then null else now() + make_interval(hours => s.open_hours) end,
+      s.created_by, s.id
+    );
+    v_made := v_made + 1;
+
+    v_step := case s.frequency
+      when 'weekly' then interval '7 days'
+      when 'biweekly' then interval '14 days'
+      else interval '1 month'
+    end;
+
+    -- Advance on the wall clock until the next run is in the future.
+    while s.next_run_at <= now() loop
+      s.next_run_at := ((s.next_run_at at time zone v_tz) + v_step) at time zone v_tz;
+    end loop;
+    update poll_schedules set next_run_at = s.next_run_at where id = s.id;
+  end loop;
+  return v_made;
+end;
+$$;
+
+grant execute on function spawn_due_polls() to authenticated, service_role;
+
+-- ============================================================
 -- Bootstrap the first admin. Run this SEPARATELY, once, after you've
 -- signed up in the app yourself — replace the email below with yours.
 -- Every future admin promotion after this one can be done the same

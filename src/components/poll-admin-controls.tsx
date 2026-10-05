@@ -1,12 +1,19 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { createPoll, deletePoll, updatePoll } from "@/app/dashboard/polls/actions";
+import {
+  createPoll,
+  deletePoll,
+  deleteSchedule,
+  setScheduleActive,
+  updatePoll,
+} from "@/app/dashboard/polls/actions";
 
 const inputClass = "w-full rounded-md border border-surface-border px-3 py-2 text-sm";
 
 export function NewPollForm() {
   const [open, setOpen] = useState(false);
+  const [repeat, setRepeat] = useState("none");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -54,9 +61,40 @@ export function NewPollForm() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium">Closes (optional)</label>
-              <input name="closes_at" type="datetime-local" className={inputClass} />
+              <label className="mb-1 block text-xs font-medium">Repeat</label>
+              <select
+                name="repeat"
+                value={repeat}
+                onChange={(e) => setRepeat(e.target.value)}
+                className={`${inputClass} bg-surface`}
+              >
+                <option value="none">Doesn&apos;t repeat</option>
+                <option value="weekly">Every week</option>
+                <option value="biweekly">Every 2 weeks</option>
+                <option value="monthly">Every month</option>
+              </select>
             </div>
+            {repeat === "none" ? (
+              <div>
+                <label className="mb-1 block text-xs font-medium">Closes (optional)</label>
+                <input name="closes_at" type="datetime-local" className={inputClass} />
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="mb-1 block text-xs font-medium">
+                    First goes out (blank = now)
+                  </label>
+                  <input name="first_run" type="datetime-local" className={inputClass} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium">
+                    Each one stays open for (hours, blank = until closed)
+                  </label>
+                  <input name="open_hours" type="number" min={1} className={inputClass} />
+                </div>
+              </>
+            )}
           </div>
 
           <div className="space-y-1.5 text-sm">
@@ -72,6 +110,12 @@ export function NewPollForm() {
             <label className="flex items-center gap-2">
               <input type="checkbox" name="anonymous" defaultChecked /> Anonymous (exec sees counts, not names)
             </label>
+            {repeat !== "none" && (
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="close_previous" defaultChecked /> Close the previous
+                one when the next goes out
+              </label>
+            )}
           </div>
 
           {error && <p className="text-xs text-red-600">{error}</p>}
@@ -137,6 +181,46 @@ export function PollManage({
         className="text-red-600 underline disabled:opacity-50"
       >
         Delete
+      </button>
+      {error && <span className="text-red-600">{error}</span>}
+    </div>
+  );
+}
+
+export function ScheduleManage({ scheduleId, active }: { scheduleId: string; active: boolean }) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function run(action: () => Promise<void>) {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await action();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed");
+      }
+    });
+  }
+
+  return (
+    <div className="flex items-center gap-4 text-xs">
+      <button
+        disabled={pending}
+        onClick={() => run(() => setScheduleActive(scheduleId, !active))}
+        className="underline disabled:opacity-50"
+      >
+        {active ? "Pause" : "Resume"}
+      </button>
+      <button
+        disabled={pending}
+        onClick={() => {
+          if (confirm("Stop this recurring poll? Polls already sent stay.")) {
+            run(() => deleteSchedule(scheduleId));
+          }
+        }}
+        className="text-red-600 underline disabled:opacity-50"
+      >
+        Delete schedule
       </button>
       {error && <span className="text-red-600">{error}</span>}
     </div>

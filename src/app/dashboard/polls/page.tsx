@@ -1,8 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatChapterTime } from "@/lib/chapter-time";
-import { NewPollForm, PollManage } from "@/components/poll-admin-controls";
+import { NewPollForm, PollManage, ScheduleManage } from "@/components/poll-admin-controls";
 import { PollVoteForm } from "@/components/poll-vote-form";
-import type { Poll, PollVote, Profile } from "@/lib/types";
+import type { Poll, PollSchedule, PollVote, Profile } from "@/lib/types";
 
 const AUDIENCE_LABEL: Record<Poll["audience"], string> = {
   everyone: "Everyone",
@@ -17,13 +17,18 @@ export default async function PollsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: polls }, { data: votes }, { data: people }] =
+  const [{ data: profile }, { data: polls }, { data: votes }, { data: people }, { data: schedules }] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("id", user!.id).single<Profile>(),
       supabase.from("polls").select("*").order("created_at", { ascending: false }).returns<Poll[]>(),
       // RLS: my own votes, plus everyone's on non-anonymous polls if I'm exec.
       supabase.from("poll_votes").select("poll_id, user_id, option_index").returns<PollVote[]>(),
       supabase.from("profiles").select("id, full_name, is_pledge"),
+      supabase
+        .from("poll_schedules")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .returns<PollSchedule[]>(),
     ]);
 
   const isExec = profile?.role === "admin" || !!profile?.is_exec;
@@ -62,6 +67,32 @@ export default async function PollsPage() {
         <h1 className="text-lg font-semibold">Polls</h1>
       </div>
       {isExec && <NewPollForm />}
+
+      {isExec && (schedules ?? []).length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-medium text-muted">Recurring polls</h2>
+          {(schedules ?? []).map((s) => (
+            <div
+              key={s.id}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-surface-border p-3"
+            >
+              <div className="min-w-0 text-sm">
+                <p className="font-medium">{s.question}</p>
+                <p className="text-xs text-muted-foreground">
+                  {{ weekly: "Every week", biweekly: "Every 2 weeks", monthly: "Every month" }[s.frequency]}
+                  {" · "}
+                  {AUDIENCE_LABEL[s.audience]}
+                  {s.required && " · required"}
+                  {s.active
+                    ? ` · next ${formatChapterTime(s.next_run_at, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
+                    : " · paused"}
+                </p>
+              </div>
+              <ScheduleManage scheduleId={s.id} active={s.active} />
+            </div>
+          ))}
+        </section>
+      )}
 
       {(polls ?? []).length === 0 && (
         <p className="text-sm text-muted-foreground">No polls yet.</p>

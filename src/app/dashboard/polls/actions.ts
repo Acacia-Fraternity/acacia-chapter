@@ -34,6 +34,32 @@ export async function createPoll(formData: FormData) {
   }
   const closesRaw = String(formData.get("closes_at") ?? "");
 
+  const repeat = String(formData.get("repeat") ?? "none");
+  if (repeat !== "none") {
+    if (!["weekly", "biweekly", "monthly"].includes(repeat)) throw new Error("Invalid repeat");
+    const firstRaw = String(formData.get("first_run") ?? "");
+    const hours = Number(formData.get("open_hours") ?? 0);
+    const { error: schedError } = await supabase.from("poll_schedules").insert({
+      question,
+      options,
+      allow_multiple: formData.get("allow_multiple") === "on",
+      anonymous: formData.get("anonymous") === "on",
+      required: formData.get("required") === "on",
+      audience,
+      frequency: repeat,
+      // Blank = start now.
+      next_run_at: firstRaw ? chapterWallTimeToIso(firstRaw) : new Date().toISOString(),
+      open_hours: Number.isFinite(hours) && hours > 0 ? Math.round(hours) : null,
+      close_previous: formData.get("close_previous") === "on",
+      created_by: user.id,
+    });
+    if (schedError) throw new Error(schedError.message);
+    // A first run that is already due goes out right away.
+    await supabase.rpc("spawn_due_polls");
+    refresh();
+    return;
+  }
+
   const { error } = await supabase.from("polls").insert({
     question,
     options,
@@ -76,6 +102,25 @@ export async function updatePoll(
 export async function deletePoll(pollId: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("polls").delete().eq("id", pollId);
+  if (error) throw new Error(error.message);
+  refresh();
+}
+
+export async function setScheduleActive(scheduleId: string, active: boolean) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("poll_schedules")
+    .update({ active })
+    .eq("id", scheduleId)
+    .select("id");
+  if (error) throw new Error(error.message);
+  if (!data?.length) throw new Error("Only exec can change schedules");
+  refresh();
+}
+
+export async function deleteSchedule(scheduleId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("poll_schedules").delete().eq("id", scheduleId);
   if (error) throw new Error(error.message);
   refresh();
 }

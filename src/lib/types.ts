@@ -202,3 +202,18 @@ export interface PollVote {
   user_id: string;
   option_index: number;
 }
+
+export interface PollSchedule {
+  id: string;
+  question: string;
+  options: string[];
+  allow_multiple: boolean;
+  anonymous: boolean;
+  required: boolean;
+  audience: Poll["audience"];
+  frequency: "weekly" | "biweekly" | "monthly";
+  next_run_at: string;
+  open_hours: number | null;
+  close_previous: boolean;
+  active: boolean;
+}

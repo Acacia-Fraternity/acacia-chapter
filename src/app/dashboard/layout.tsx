@@ -24,6 +24,10 @@ export default async function DashboardLayout({
     .eq("id", user.id)
     .single<Profile>();
 
+  // Recurring polls that have come due turn into real polls here, so a
+  // required one gates this very load. Failure just means a later load tries again.
+  await supabase.rpc("spawn_due_polls");
+
   // A required poll replaces the whole app until it is answered. RLS lets exec
   // see polls outside their audience, so the audience is re-checked here.
   const isExec = profile?.role === "admin" || !!profile?.is_exec;
