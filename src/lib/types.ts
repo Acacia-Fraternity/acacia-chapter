@@ -105,6 +105,11 @@ export interface EventPresence {
   minutes_on_site: number;
 }
 
+export interface EventSoberBrother {
+  event_id: string;
+  user_id: string;
+}
+
 export interface EventFile {
   id: string;
   event_id: string;

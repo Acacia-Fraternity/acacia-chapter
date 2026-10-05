@@ -406,6 +406,12 @@ when the selected person changes, and the page refreshes every 60 s.
   when/where and never rejects. Never checking out = 0 hours for a Philo event.
   (The earlier "auto check-out when you leave" idea was dropped on purpose.)
 
+- **Sober brothers** (`event_sober_brothers`): for Social event / Party types
+  the new-event form asks "Sober?"; Yes reveals a multi-select of non-pledge
+  brothers, saved as join rows (readable by everyone, writable only by
+  calendar editors) and shown on the Events card and calendar detail.
+  "General social event" is no longer offered (value still allowed in the DB).
+
 ## No public sign-up (admin-created accounts)
 
 There is no sign-up form. `/login` is sign-in only. Accounts are created

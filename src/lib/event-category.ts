@@ -1,17 +1,22 @@
 import type { EventCategory } from "@/lib/types";
 
-// "other" is only for events that predate these types (the imported calendar
-// used it as the default); it isn't offered when creating a new event.
+// What can be chosen when creating an event.
 export const EVENT_CATEGORIES: { value: EventCategory; label: string }[] = [
   { value: "chapter_meeting", label: "Chapter" },
   { value: "philanthropy", label: "Philo event" },
   { value: "social", label: "Social event" },
   { value: "party", label: "Party" },
-  { value: "general_social", label: "General social event" },
 ];
 
+// Types that get the "Sober?" question.
+export const SOBER_CATEGORIES: EventCategory[] = ["social", "party"];
+
+// "other" and "general_social" are legacy values still allowed by the
+// database (the imported calendar defaulted to "other"); they just aren't
+// offered for new events.
 export function categoryLabel(category: EventCategory): string {
   if (category === "other") return "Other";
+  if (category === "general_social") return "General social event";
   return EVENT_CATEGORIES.find((c) => c.value === category)?.label ?? "Other";
 }
 

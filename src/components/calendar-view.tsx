@@ -132,10 +132,12 @@ function layoutDay(day: Date, events: Event[]): Segment[] {
 export function CalendarView({
   events,
   checkedInEventIds,
+  soberByEvent,
   canEdit,
 }: {
   events: Event[];
   checkedInEventIds: string[];
+  soberByEvent: Record<string, string[]>;
   canEdit: boolean;
 }) {
   const [view, setView] = useState<View>("week");
@@ -472,6 +474,7 @@ export function CalendarView({
         <EventDetail
           event={selected}
           checkedIn={checkedInSet.has(selected.id)}
+          soberNames={soberByEvent[selected.id] ?? []}
           canEdit={canEdit}
           onClose={() => setSelectedId(null)}
         />
@@ -573,11 +576,13 @@ function MonthGrid({
 function EventDetail({
   event,
   checkedIn,
+  soberNames,
   canEdit,
   onClose,
 }: {
   event: Event;
   checkedIn: boolean;
+  soberNames: string[];
   canEdit: boolean;
   onClose: () => void;
 }) {
@@ -606,6 +611,12 @@ function EventDetail({
             : `${start.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })} · ${fmtTime(start)} – ${fmtTime(end)}`}
         </p>
         {event.address && <p className="text-sm text-muted">{event.address}</p>}
+        {soberNames.length > 0 && (
+          <p className="text-sm">
+            <span className="font-medium">Sober brothers:</span>{" "}
+            <span className="text-muted">{soberNames.join(", ")}</span>
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-1.5 pt-1">
           <span
             className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${categoryBadgeClass(event.category)}`}

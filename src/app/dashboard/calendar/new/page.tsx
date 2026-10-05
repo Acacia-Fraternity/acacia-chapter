@@ -23,8 +23,15 @@ export default async function NewEventPage() {
     redirect("/dashboard/calendar");
   }
 
+  // Pledges aren't offered as sober brothers.
+  const { data: members } = await supabase
+    .from("profiles")
+    .select("id, full_name")
+    .eq("is_pledge", false)
+    .order("full_name");
+
   return (
-    <div className="space-y-4 max-w-lg">
+    <div className="space-y-4 max-w-lg mx-auto">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">New event</h1>
         <Link href="/dashboard/calendar" className="text-sm text-muted underline">
@@ -57,7 +64,12 @@ export default async function NewEventPage() {
           />
         </div>
 
-        <EventTypeFields />
+        <EventTypeFields
+          members={(members ?? []).map((m) => ({
+            id: m.id,
+            name: m.full_name || "(no name)",
+          }))}
+        />
 
         <LocationPicker />
 

@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { chapterWallTimeToIso } from "@/lib/chapter-time";
-import { EVENT_CATEGORIES } from "@/lib/event-category";
+import { EVENT_CATEGORIES, SOBER_CATEGORIES } from "@/lib/event-category";
+import type { EventCategory } from "@/lib/types";
 
 // Same for every event: close enough that the GPS check means "you are
 // actually there" without failing people standing at the edge of a venue.
@@ -41,7 +42,17 @@ export async function createEvent(formData: FormData) {
 
   if (!user) redirect("/login");
 
-  const { error } = await supabase.from("events").insert({
+  // Only social events and parties have sober brothers; the picker only
+  // submits ids while "Yes" is chosen, but a stale/forged form must not
+  // attach them to another type.
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const soberIds = SOBER_CATEGORIES.includes(category as EventCategory)
+    ? Array.from(new Set(formData.getAll("sober_ids").map(String))).filter((id) =>
+        uuid.test(id),
+      )
+    : [];
+
+  const { data: created, error } = await supabase.from("events").insert({
     name,
     description,
     address,
@@ -53,10 +64,22 @@ export async function createEvent(formData: FormData) {
     starts_at: chapterWallTimeToIso(startsAt),
     ends_at: chapterWallTimeToIso(endsAt),
     created_by: user.id,
-  });
+  }).select("id").single();
 
-  if (error) {
-    throw new Error(error.message);
+  if (error || !created) {
+    throw new Error(error?.message ?? "Couldn't create the event");
+  }
+
+  if (soberIds.length > 0) {
+    const { error: soberError } = await supabase
+      .from("event_sober_brothers")
+      .insert(soberIds.map((user_id) => ({ event_id: created.id, user_id })));
+    if (soberError) {
+      // Don't leave an event behind that is missing the sober brothers the
+      // creator asked for.
+      await supabase.from("events").delete().eq("id", created.id);
+      throw new Error(soberError.message);
+    }
   }
 
   redirect("/dashboard/calendar");

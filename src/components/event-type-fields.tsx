@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { EVENT_CATEGORIES } from "@/lib/event-category";
+import { EVENT_CATEGORIES, SOBER_CATEGORIES } from "@/lib/event-category";
+import { SoberPicker, type PickerMember } from "@/components/sober-picker";
 import type { EventCategory } from "@/lib/types";
 
 const inputClass =
@@ -9,7 +10,7 @@ const inputClass =
 
 // Service hours only mean something for Philo events (hours are earned by
 // time on site), so the field exists only while that type is selected.
-export function EventTypeFields() {
+export function EventTypeFields({ members }: { members: PickerMember[] }) {
   const [category, setCategory] = useState<EventCategory>("chapter_meeting");
 
   return (
@@ -29,6 +30,8 @@ export function EventTypeFields() {
           ))}
         </select>
       </div>
+
+      {SOBER_CATEGORIES.includes(category) && <SoberPicker members={members} />}
 
       {category === "philanthropy" && (
         <div>

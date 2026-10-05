@@ -1258,6 +1258,26 @@ create policy "members submit and edit their own feedback"
   on event_feedback for all to authenticated
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- Designated sober brothers for a social event or party. No row = nobody
+-- designated. Everyone can see who they are (that's the point); only
+-- calendar editors assign them.
+create table if not exists event_sober_brothers (
+  event_id uuid not null references events (id) on delete cascade,
+  user_id uuid not null references profiles (id) on delete cascade,
+  primary key (event_id, user_id)
+);
+
+alter table event_sober_brothers enable row level security;
+
+drop policy if exists "sober brothers are viewable by any signed-in member" on event_sober_brothers;
+create policy "sober brothers are viewable by any signed-in member"
+  on event_sober_brothers for select to authenticated using (true);
+
+drop policy if exists "calendar editors manage sober brothers" on event_sober_brothers;
+create policy "calendar editors manage sober brothers"
+  on event_sober_brothers for all to authenticated
+  using (can_edit_calendar()) with check (can_edit_calendar());
+
 -- ============================================================
 -- Bootstrap the first admin. Run this SEPARATELY, once, after you've
 -- signed up in the app yourself — replace the email below with yours.

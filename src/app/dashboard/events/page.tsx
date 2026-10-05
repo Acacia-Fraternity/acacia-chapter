@@ -21,6 +21,7 @@ import type {
   EventExcuse,
   EventFeedback,
   EventPresence,
+  EventSoberBrother,
   Profile,
   RsvpStatus,
 } from "@/lib/types";
@@ -65,6 +66,7 @@ export default async function EventsPage() {
     { data: excuses },
     { data: feedback },
     { data: presence },
+    { data: sober },
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single<Profile>(),
     supabase.from("profiles").select("id, full_name"),
@@ -87,6 +89,7 @@ export default async function EventsPage() {
       .select("*")
       .eq("user_id", user!.id)
       .returns<EventPresence[]>(),
+    supabase.from("event_sober_brothers").select("*").returns<EventSoberBrother[]>(),
   ]);
 
   const isAdmin = profile?.role === "admin";
@@ -146,6 +149,9 @@ export default async function EventsPage() {
           const pendingExcuses = (excuses ?? []).filter(
             (x) => x.event_id === event.id && x.status === "pending",
           );
+          const soberNames = (sober ?? [])
+            .filter((b) => b.event_id === event.id)
+            .map((b) => nameById.get(b.user_id) ?? "Unknown");
           const minutesOnSite = minutesByEvent.get(event.id) ?? 0;
           const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${
             event.address
@@ -218,6 +224,13 @@ export default async function EventsPage() {
                     )}
                   </div>
                 </div>
+
+                {soberNames.length > 0 && (
+                  <p className="text-sm">
+                    <span className="font-medium">Sober brothers:</span>{" "}
+                    <span className="text-muted">{soberNames.join(", ")}</span>
+                  </p>
+                )}
 
                 {minutesOnSite > 0 && (
                   <p className="text-xs text-acacia-green">
