@@ -15,13 +15,9 @@ const archivo = Archivo({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const cookieStore = await cookies();
-  const icon = cookieStore.get("acacia-icon")?.value === "crest" ? "icon-crest" : "icon-mark";
-
   return {
     title: "Acacia",
     description: "Chapter attendance, involvement, and chat tracker",
-    manifest: `/manifest.webmanifest?icon=${icon === "icon-crest" ? "crest" : "mark"}`,
     // Setting `icons` here REPLACES Next's automatic <link rel="icon"> for
     // src/app/icon.svg, so the tab icon has to be declared explicitly or the
     // browser shows a blank globe. Safari ignores SVG favicons, hence the PNG.
@@ -30,7 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
         { url: "/icon.svg", type: "image/svg+xml" },
         { url: "/icon-mark?size=64", type: "image/png", sizes: "64x64" },
       ],
-      apple: `/${icon}?size=180`,
+      apple: "/icon-mark?size=180",
     },
   };
 }

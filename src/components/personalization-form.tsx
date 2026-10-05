@@ -1,20 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { setTheme, setIconPreference } from "@/app/dashboard/personalization/actions";
+import { setTheme } from "@/app/dashboard/personalization/actions";
 
 type Theme = "light" | "dark" | "system";
-type Icon = "mark" | "crest";
 
-export function PersonalizationForm({
-  initialTheme,
-  initialIcon,
-}: {
-  initialTheme: Theme;
-  initialIcon: Icon;
-}) {
+export function PersonalizationForm({ initialTheme }: { initialTheme: Theme }) {
   const [theme, setThemeState] = useState<Theme>(initialTheme);
-  const [icon, setIconState] = useState<Icon>(initialIcon);
   const [, startTransition] = useTransition();
 
   function applyTheme(next: Theme) {
@@ -26,13 +18,6 @@ export function PersonalizationForm({
     }
     startTransition(() => {
       setTheme(next);
-    });
-  }
-
-  function applyIcon(next: Icon) {
-    setIconState(next);
-    startTransition(() => {
-      setIconPreference(next);
     });
   }
 
@@ -59,41 +44,6 @@ export function PersonalizationForm({
           &quot;System&quot; follows your phone or browser&apos;s own light/dark
           setting.
         </p>
-      </section>
-
-      <section className="space-y-2">
-        <h2 className="text-sm font-medium text-muted">Home screen icon</h2>
-        <p className="text-xs text-muted-foreground">
-          Choose which Acacia mark appears if you add this app to your
-          phone&apos;s home screen. If you&apos;ve already added it, remove and
-          re-add the shortcut for the change to take effect — phones cache
-          the icon at the moment you add it, they don&apos;t update it later.
-        </p>
-        <div className="flex gap-3">
-          {(["mark", "crest"] as const).map((option) => (
-            <button
-              key={option}
-              onClick={() => applyIcon(option)}
-              className={`flex-1 rounded-lg border p-3 flex flex-col items-center gap-2 ${
-                icon === option
-                  ? "border-acacia-gold bg-acacia-gold/10"
-                  : "border-surface-border"
-              }`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`/icon-${option}?size=96`}
-                alt={option === "mark" ? "Acacia A" : "Acacia Crest"}
-                width={64}
-                height={64}
-                className="rounded-lg"
-              />
-              <span className="text-xs">
-                {option === "mark" ? "Acacia A" : "Crest"}
-              </span>
-            </button>
-          ))}
-        </div>
       </section>
     </div>
   );

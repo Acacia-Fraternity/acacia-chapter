@@ -6,11 +6,9 @@ import { NotificationSettings } from "@/components/notification-settings";
 export default async function PersonalizationPage() {
   const cookieStore = await cookies();
   const themeCookie = cookieStore.get("acacia-theme")?.value;
-  const iconCookie = cookieStore.get("acacia-icon")?.value;
 
   const initialTheme =
     themeCookie === "light" || themeCookie === "dark" ? themeCookie : "system";
-  const initialIcon = iconCookie === "crest" ? "crest" : "mark";
 
   const supabase = await createClient();
   const {
@@ -25,7 +23,7 @@ export default async function PersonalizationPage() {
   return (
     <div className="space-y-8 max-w-md">
       <h1 className="text-lg font-semibold">Personalization</h1>
-      <PersonalizationForm initialTheme={initialTheme} initialIcon={initialIcon} />
+      <PersonalizationForm initialTheme={initialTheme} />
       <NotificationSettings
         userId={user!.id}
         initial={{

@@ -75,7 +75,7 @@ export default async function EventsPage() {
     supabase
       .from("events")
       .select("*")
-      .order("starts_at", { ascending: false })
+      .order("starts_at", { ascending: true })
       .returns<Event[]>(),
     supabase
       .from("checkins")
@@ -94,6 +94,16 @@ export default async function EventsPage() {
     supabase.from("event_sober_brothers").select("*").returns<EventSoberBrother[]>(),
     supabase.from("event_assignments").select("*").returns<EventAssignment[]>(),
   ]);
+
+  // Soonest first: running/upcoming events in chronological order, then past
+  // ones (most recent first) so they don't bury what's coming up.
+  const now = new Date().getTime();
+  const sortedEvents = [
+    ...(events ?? []).filter((e) => new Date(e.ends_at).getTime() >= now),
+    ...(events ?? [])
+      .filter((e) => new Date(e.ends_at).getTime() < now)
+      .reverse(),
+  ];
 
   const isAdmin = profile?.role === "admin";
   const nameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name]));
@@ -127,12 +137,12 @@ export default async function EventsPage() {
         )}
       </div>
 
-      {(!events || events.length === 0) && (
+      {sortedEvents.length === 0 && (
         <p className="text-sm text-muted">No events yet.</p>
       )}
 
       <ul className="space-y-4">
-        {events?.map((event) => {
+        {sortedEvents.map((event) => {
           const status = eventStatus(event);
           const checkin = checkinByEvent.get(event.id);
           const eventFiles = (files ?? []).filter((f) => f.event_id === event.id);

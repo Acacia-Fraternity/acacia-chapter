@@ -226,9 +226,9 @@ Archivo (Google Fonts, free) substitutes for Acacia's real typeface
 **not** theme-dependent — they don't change between light/dark mode, only
 the `surface`/`background`/`muted` tokens do (see Personalization below).
 
-## Personalization (theme + home-screen icon)
+## Personalization (theme)
 
-Both stored as **cookies**, not account data — deliberately device-level,
+Stored as a **cookie**, not account data — deliberately device-level,
 matching how most apps treat dark mode as a per-device setting:
 - `acacia-theme` (light/dark/system) — read server-side in
   `src/app/layout.tsx` to set `data-theme` on `<html>` before first paint
@@ -236,17 +236,11 @@ matching how most apps treat dark mode as a per-device setting:
   selector and a `prefers-color-scheme: dark` media query for "system",
   with explicit light always winning — same contract used for
   theme-aware Artifacts.
-- `acacia-icon` (mark/crest) — which mark shows up for "Add to Home
-  Screen." Both `src/app/manifest.ts` (Android/Chrome) and the
-  `apple-touch-icon` link in `layout.tsx`'s `generateMetadata` (iOS) read
-  this cookie and point at `src/app/icon-mark/route.tsx` or
-  `icon-crest/route.tsx` — both dynamically rasterize the real brand
-  assets to PNG via `next/og`'s `ImageResponse` at request time (phones
-  need real raster images for home-screen icons, not SVG on iOS).
-  **Limitation, stated on the page itself**: phones cache the icon at the
-  moment it's added to the home screen — changing this preference
-  afterward doesn't retroactively update an already-placed icon; the user
-  has to remove and re-add the shortcut.
+
+There used to be an Acacia-A-vs-crest home-screen icon choice. Removed on
+purpose: phones copy the icon when "Add to Home Screen" is tapped and a web
+app can never change it afterward (only a native app can). The home-screen and
+touch icon is always the A (`src/app/icon-mark/route.tsx`).
 
 ## Sidebar (src/components/dashboard-sidebar.tsx)
 
