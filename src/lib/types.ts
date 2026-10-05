@@ -183,3 +183,23 @@ export interface CanvasGrade {
   current_grade: string | null;
   synced_at: string;
 }
+
+export interface Poll {
+  id: string;
+  question: string;
+  options: string[];
+  allow_multiple: boolean;
+  anonymous: boolean;
+  required: boolean;
+  audience: "everyone" | "actives" | "pledges" | "exec";
+  closes_at: string | null;
+  closed: boolean;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface PollVote {
+  poll_id: string;
+  user_id: string;
+  option_index: number;
+}

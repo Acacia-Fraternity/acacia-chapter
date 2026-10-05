@@ -532,3 +532,9 @@ three different free-tier ownership models:
   subtab is the old curriculum quiz. `/dashboard/curriculum` redirects.
 - **Places** (`src/lib/places.ts`): SRSC + IU residence halls — quick-pick in the
   event location picker and markers on the House Presence map.
+- **Polls** (`/dashboard/polls`): exec/admins create; `polls.required` makes the
+  dashboard layout render `PollGate` instead of the app until the member answers
+  (checked on each full page load / login — a client-side navigation doesn't re-run
+  the layout). Votes only via `submit_poll_vote()`; counts via `poll_counts()` so
+  anonymous polls never expose who voted for what. Wine night events carry
+  `events.sorority` (`src/lib/sororities.ts`); Sobers picker is wine night + party.

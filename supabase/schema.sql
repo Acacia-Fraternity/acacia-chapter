@@ -1499,6 +1499,150 @@ create policy "pledges see own grades, committee sees pledge grades"
   );
 
 -- ============================================================
+-- Polls — created by exec/admins. A poll marked `required` blocks the rest of
+-- the app (dashboard layout) for everyone in its audience until they answer.
+-- Votes are written only through submit_poll_vote(), which enforces audience,
+-- open/closed, single vs multiple choice, and one submission per member.
+-- Anonymous polls: votes are only readable by the voter; everyone else (exec
+-- included) sees counts via poll_counts().
+-- ============================================================
+create table if not exists polls (
+  id uuid primary key default gen_random_uuid(),
+  question text not null check (char_length(trim(question)) between 1 and 300),
+  options jsonb not null,
+  allow_multiple boolean not null default false,
+  anonymous boolean not null default true,
+  required boolean not null default false,
+  audience text not null default 'everyone'
+    check (audience in ('everyone', 'actives', 'pledges', 'exec')),
+  closes_at timestamptz,
+  closed boolean not null default false,
+  created_by uuid references profiles (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+alter table polls enable row level security;
+
+create or replace function poll_in_audience(p_audience text)
+returns boolean
+language sql
+security definer set search_path = public
+stable
+as $$
+  select case p_audience
+    when 'everyone' then exists (select 1 from profiles where id = auth.uid())
+    when 'actives' then coalesce((select not is_pledge from profiles where id = auth.uid()), false)
+    when 'pledges' then coalesce((select is_pledge from profiles where id = auth.uid()), false)
+    when 'exec' then is_exec()
+    else false
+  end;
+$$;
+
+drop policy if exists "polls visible to their audience and exec" on polls;
+create policy "polls visible to their audience and exec"
+  on polls for select to authenticated
+  using (poll_in_audience(audience) or is_exec());
+
+drop policy if exists "exec manage polls" on polls;
+create policy "exec manage polls"
+  on polls for all to authenticated
+  using (is_exec()) with check (is_exec());
+
+create table if not exists poll_votes (
+  poll_id uuid not null references polls (id) on delete cascade,
+  user_id uuid not null references profiles (id) on delete cascade,
+  option_index integer not null check (option_index >= 0),
+  voted_at timestamptz not null default now(),
+  primary key (poll_id, user_id, option_index)
+);
+
+alter table poll_votes enable row level security;
+
+drop policy if exists "votes: own, or exec on non-anonymous polls" on poll_votes;
+create policy "votes: own, or exec on non-anonymous polls"
+  on poll_votes for select to authenticated
+  using (
+    user_id = auth.uid()
+    or (is_exec() and exists (select 1 from polls p where p.id = poll_id and not p.anonymous))
+  );
+
+create or replace function submit_poll_vote(p_poll_id uuid, p_options integer[])
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_poll polls;
+  v_count integer;
+  v_opt integer;
+begin
+  select * into v_poll from polls where id = p_poll_id;
+  if not found or not poll_in_audience(v_poll.audience) then
+    raise exception 'Poll not found';
+  end if;
+  if v_poll.closed or (v_poll.closes_at is not null and v_poll.closes_at <= now()) then
+    raise exception 'This poll is closed';
+  end if;
+  if exists (select 1 from poll_votes where poll_id = p_poll_id and user_id = auth.uid()) then
+    raise exception 'You already answered this poll';
+  end if;
+
+  v_count := coalesce(array_length(p_options, 1), 0);
+  if v_count = 0 then
+    raise exception 'Choose an answer';
+  end if;
+  if not v_poll.allow_multiple and v_count > 1 then
+    raise exception 'Choose only one answer';
+  end if;
+
+  foreach v_opt in array p_options loop
+    if v_opt < 0 or v_opt >= jsonb_array_length(v_poll.options) then
+      raise exception 'Invalid answer';
+    end if;
+  end loop;
+
+  insert into poll_votes (poll_id, user_id, option_index)
+  select p_poll_id, auth.uid(), distinct_opt from unnest(p_options) as distinct_opt
+  group by distinct_opt;
+end;
+$$;
+
+grant execute on function submit_poll_vote(uuid, integer[]) to authenticated;
+
+-- Per-option counts, plus option_index = -1 holding the number of people who
+-- answered. Returns nothing unless the caller is exec, has answered, or the
+-- poll is over — so results can't be peeked at before voting.
+create or replace function poll_counts(p_poll_id uuid)
+returns table (option_index integer, votes bigint)
+language plpgsql
+security definer set search_path = public
+stable
+as $$
+declare
+  v_poll polls;
+begin
+  select * into v_poll from polls where id = p_poll_id;
+  if not found then return; end if;
+  if not (
+    is_exec()
+    or exists (select 1 from poll_votes where poll_id = p_poll_id and user_id = auth.uid())
+    or (poll_in_audience(v_poll.audience)
+        and (v_poll.closed or (v_poll.closes_at is not null and v_poll.closes_at <= now())))
+  ) then
+    return;
+  end if;
+
+  return query
+    select pv.option_index, count(*)::bigint from poll_votes pv
+    where pv.poll_id = p_poll_id group by pv.option_index
+    union all
+    select -1, count(distinct pv.user_id)::bigint from poll_votes pv where pv.poll_id = p_poll_id;
+end;
+$$;
+
+grant execute on function poll_counts(uuid) to authenticated;
+
+-- ============================================================
 -- Bootstrap the first admin. Run this SEPARATELY, once, after you've
 -- signed up in the app yourself — replace the email below with yours.
 -- Every future admin promotion after this one can be done the same
