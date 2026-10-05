@@ -40,73 +40,72 @@ export function RoleAccessMatrix({
     });
   }
 
+  // One dropdown per tab, in the catalog's order.
   const groups = Array.from(new Set(PERMISSIONS.map((p) => p.group)));
 
   return (
-    <div className="space-y-3">
-      <div className="overflow-x-auto rounded-lg border border-surface-border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-surface-border text-left text-xs text-muted">
-              <th className="px-3 py-2 font-medium">Access</th>
-              {ROLES.map((r) => (
-                <th key={r.value} className="w-20 px-3 py-2 text-center font-medium">
-                  {r.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {groups.map((group) => (
-              <FragmentRows key={group} group={group} isOn={isOn} toggle={toggle} pending={pending} />
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="space-y-2">
+      {groups.map((group) => {
+        const perms = PERMISSIONS.filter((p) => p.group === group);
+        return (
+          <details key={group} className="rounded-lg border border-surface-border">
+            <summary className="flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5 text-sm font-medium">
+              <span>{group}</span>
+              <span className="flex gap-3 text-xs font-normal text-muted-foreground">
+                {ROLES.map((r) => {
+                  const on = perms.filter((p) => isOn(r.value, p.key, p.defaults[r.value])).length;
+                  return (
+                    <span key={r.value}>
+                      {r.label} {on}/{perms.length}
+                    </span>
+                  );
+                })}
+              </span>
+            </summary>
+
+            <table className="w-full border-t border-surface-border text-sm">
+              <thead>
+                <tr className="text-left text-xs text-muted">
+                  <th className="px-3 py-1.5 font-medium">Setting</th>
+                  {ROLES.map((r) => (
+                    <th key={r.value} className="w-20 px-3 py-1.5 text-center font-medium">
+                      {r.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {perms.map((p) => {
+                  const label = p.path ? `Open the ${p.label} tab` : p.label;
+                  return (
+                    <tr key={p.key} className="border-t border-surface-border">
+                      <td className="px-3 py-1.5">{label}</td>
+                      {ROLES.map((r) => (
+                        <td key={r.value} className="px-3 py-1.5 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isOn(r.value, p.key, p.defaults[r.value])}
+                            disabled={pending}
+                            onChange={(e) => toggle(r.value, p.key, e.target.checked)}
+                            aria-label={`${label} for ${r.label}`}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </details>
+        );
+      })}
       {error && <p className="text-xs text-red-600">{error}</p>}
       <p className="text-xs text-muted-foreground">
-        Changes save as you tick them. Admins always have full access. A person&apos;s role comes
-        from their Pledge / Exec boxes below (neither = Active). Per-person boxes like Chat,
-        React, Calendar and Pledge cmte still apply on top of this.
+        Open a tab to change its settings; changes save as you tick them. The counts show how many
+        of that tab&apos;s settings each role has on. Admins always have full access. A person&apos;s
+        role comes from their Pledge / Exec boxes below (neither = Active). Per-person boxes like
+        Chat, React, Calendar and Pledge cmte still apply on top of this.
       </p>
     </div>
-  );
-}
-
-function FragmentRows({
-  group,
-  isOn,
-  toggle,
-  pending,
-}: {
-  group: string;
-  isOn: (role: Role, key: string, fallback: boolean) => boolean;
-  toggle: (role: Role, key: string, next: boolean) => void;
-  pending: boolean;
-}) {
-  return (
-    <>
-      <tr className="bg-surface-border/40">
-        <td colSpan={4} className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted">
-          {group}
-        </td>
-      </tr>
-      {PERMISSIONS.filter((p) => p.group === group).map((p) => (
-        <tr key={p.key} className="border-t border-surface-border">
-          <td className="px-3 py-1.5">{p.label}</td>
-          {ROLES.map((r) => (
-            <td key={r.value} className="px-3 py-1.5 text-center">
-              <input
-                type="checkbox"
-                checked={isOn(r.value, p.key, p.defaults[r.value])}
-                disabled={pending}
-                onChange={(e) => toggle(r.value, p.key, e.target.checked)}
-                aria-label={`${p.label} for ${r.label}`}
-              />
-            </td>
-          ))}
-        </tr>
-      ))}
-    </>
   );
 }
