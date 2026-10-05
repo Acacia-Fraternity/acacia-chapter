@@ -170,7 +170,7 @@ create table if not exists events (
   -- meeting/social that doesn't award anything.
   hours numeric not null default 0,
   category text not null default 'other'
-    check (category in ('chapter_meeting', 'social', 'philanthropy', 'other')),
+    check (category in ('chapter_meeting', 'philanthropy', 'social', 'party', 'general_social', 'other')),
   starts_at timestamptz not null,
   ends_at timestamptz not null,
   created_by uuid not null references profiles (id),
@@ -183,7 +183,11 @@ create table if not exists events (
 alter table events add column if not exists category text not null default 'other';
 alter table events drop constraint if exists events_category_check;
 alter table events add constraint events_category_check
-  check (category in ('chapter_meeting', 'social', 'philanthropy', 'other'));
+  check (category in ('chapter_meeting', 'philanthropy', 'social', 'party', 'general_social', 'other'));
+
+-- "party" used to be folded into "social"; split out the events already
+-- named as parties (idempotent: only touches rows still marked social).
+update events set category = 'party' where category = 'social' and name ilike 'party%';
 
 alter table events enable row level security;
 
@@ -336,6 +340,14 @@ begin
       round(v_distance), v_event.radius_meters;
   end if;
 
+  -- A second check-in would reset the start time, so for philanthropy
+  -- (where hours are measured from it) it is refused outright.
+  if v_event.category = 'philanthropy' and exists (
+    select 1 from checkins where event_id = p_event_id and user_id = auth.uid()
+  ) then
+    raise exception 'You have already checked in to this event';
+  end if;
+
   select * into v_prev
     from checkins
     where user_id = auth.uid() and event_id != p_event_id
@@ -364,7 +376,9 @@ begin
   )
   values (
     p_event_id, auth.uid(), p_lat, p_lng, v_distance, p_accuracy,
-    v_flagged, v_flag_reason, v_event.hours
+    v_flagged, v_flag_reason,
+    -- Philanthropy hours are earned by being there, credited at check-out.
+    case when v_event.category = 'philanthropy' then 0 else v_event.hours end
   )
   on conflict (event_id, user_id) do update
     set latitude = excluded.latitude,
@@ -1067,33 +1081,81 @@ alter table checkins add column if not exists checked_out_at timestamptz;
 alter table checkins add column if not exists checkout_latitude double precision;
 alter table checkins add column if not exists checkout_longitude double precision;
 
--- Unlike check_in(), never rejects on distance: leaving is what's being
--- recorded, and the stored coordinates let an admin see where they were.
+-- Check-out. For philanthropy events it is held to the same standard as
+-- check-in — you must be within the event's radius with a real GPS fix — so
+-- hours can't be banked by tapping "check out" from home, and the hours
+-- credited are the time actually spent from check-in to check-out (floored
+-- to quarter hours, never past the event's end, capped at the event's
+-- `hours` when it sets one). For other event types it only records when and
+-- where you left and never rejects.
 create or replace function check_out(
   p_event_id uuid,
   p_lat double precision,
-  p_lng double precision
+  p_lng double precision,
+  p_accuracy double precision default null
 )
 returns checkins
 language plpgsql
 security definer set search_path = public
 as $$
 declare
+  v_max_accuracy_meters constant double precision := 100;
+  v_event events;
+  v_checkin checkins;
+  v_distance double precision;
+  v_end timestamptz;
+  v_hours numeric;
   v_row checkins;
 begin
-  update checkins
-  set checked_out_at = now(), checkout_latitude = p_lat, checkout_longitude = p_lng
-  where event_id = p_event_id and user_id = auth.uid() and checked_out_at is null
-  returning * into v_row;
+  select * into v_event from events where id = p_event_id;
+  if v_event is null then
+    raise exception 'Event not found';
+  end if;
 
-  if v_row.id is null then
+  select * into v_checkin from checkins
+  where event_id = p_event_id and user_id = auth.uid() and checked_out_at is null;
+  if v_checkin.id is null then
     raise exception 'You are not checked in to this event (or already checked out)';
   end if;
+
+  v_hours := v_checkin.hours_earned;
+
+  if v_event.category = 'philanthropy' then
+    if p_accuracy is not null and p_accuracy > v_max_accuracy_meters then
+      raise exception 'Your location signal is too weak (± % m) to check out — move somewhere with a clearer sky view and try again',
+        round(p_accuracy);
+    end if;
+    if p_accuracy is null then
+      raise exception 'Your device did not report a location accuracy — try again';
+    end if;
+
+    v_distance := haversine_meters(p_lat, p_lng, v_event.latitude, v_event.longitude);
+    if v_distance > v_event.radius_meters then
+      raise exception 'You are % meters away — you must be within % meters of the event to check out',
+        round(v_distance), v_event.radius_meters;
+    end if;
+
+    v_end := least(now(), v_event.ends_at);
+    v_hours := floor(greatest(0, extract(epoch from (v_end - v_checkin.checked_in_at))) / 900) / 4.0;
+    if v_event.hours > 0 then
+      v_hours := least(v_hours, v_event.hours);
+    end if;
+  end if;
+
+  update checkins
+  set checked_out_at = now(),
+      checkout_latitude = p_lat,
+      checkout_longitude = p_lng,
+      hours_earned = v_hours
+  where id = v_checkin.id
+  returning * into v_row;
+
   return v_row;
 end;
 $$;
 
-grant execute on function check_out(uuid, double precision, double precision) to authenticated;
+drop function if exists check_out(uuid, double precision, double precision);
+grant execute on function check_out(uuid, double precision, double precision, double precision) to authenticated;
 
 -- Reference files/docs per event. Bytes live in the existing private
 -- "chapter-files" bucket under an events/ prefix, so its admin-only upload

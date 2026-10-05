@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { chapterWallTimeToIso } from "@/lib/chapter-time";
+import { EVENT_CATEGORIES } from "@/lib/event-category";
 
 export async function createEvent(formData: FormData) {
   const supabase = await createClient();
@@ -10,12 +11,21 @@ export async function createEvent(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const address = String(formData.get("address") ?? "").trim();
-  const latitude = Number(formData.get("latitude"));
-  const longitude = Number(formData.get("longitude"));
+  const latRaw = String(formData.get("latitude") ?? "");
+  const lngRaw = String(formData.get("longitude") ?? "");
+  const latitude = Number(latRaw);
+  const longitude = Number(lngRaw);
+  // Number("") is 0 — an unpicked location must not silently become 0,0.
+  if (!latRaw || !lngRaw || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    throw new Error("Pick an address from the suggestions so check-in knows where the event is");
+  }
   const radiusMeters = Number(formData.get("radius_meters"));
   const hours = Number(formData.get("hours") ?? 0);
   const housePoints = Math.max(0, Math.trunc(Number(formData.get("house_points") ?? 0)));
-  const category =String(formData.get("category") ?? "other");
+  const categoryRaw = String(formData.get("category") ?? "");
+  const category = EVENT_CATEGORIES.some((c) => c.value === categoryRaw)
+    ? categoryRaw
+    : "other";
   const startsAt = String(formData.get("starts_at"));
   const endsAt = String(formData.get("ends_at"));
 

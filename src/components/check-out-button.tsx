@@ -24,6 +24,7 @@ export function CheckOutButton({ eventId }: { eventId: string }) {
           p_event_id: eventId,
           p_lat: position.coords.latitude,
           p_lng: position.coords.longitude,
+          p_accuracy: position.coords.accuracy,
         });
         setBusy(false);
         if (error) {

@@ -61,7 +61,7 @@ export default async function NewEventPage() {
           <label className="block text-sm font-medium mb-1">Type</label>
           <select
             name="category"
-            defaultValue="other"
+            defaultValue="chapter_meeting"
             className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
           >
             {EVENT_CATEGORIES.map((c) => (
@@ -70,6 +70,11 @@ export default async function NewEventPage() {
               </option>
             ))}
           </select>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Philo events are strict: brothers must check in at the address and
+            check out there too, and service hours are the time actually spent
+            on site.
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -88,7 +93,7 @@ export default async function NewEventPage() {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">
-              Hours awarded
+              Service hours (max)
             </label>
             <input
               name="hours"
@@ -99,8 +104,9 @@ export default async function NewEventPage() {
               className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              For philanthropy/service events — checking in credits this many
-              hours. Leave 0 for a normal meeting/social.
+              Philo events only. Hours are earned by time on site (check-in to
+              check-out), up to this cap; leave 0 to cap at the event&apos;s
+              length. Ignored for other types.
             </p>
           </div>
         </div>

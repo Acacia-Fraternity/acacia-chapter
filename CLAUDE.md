@@ -389,6 +389,23 @@ when the selected person changes, and the page refreshes every 60 s.
   Calendar). It is NOT idempotent — don't re-run it on a populated table.
   Changes made in Google Calendar after Sept 17 are not reflected.
 
+## Event types, address search, strict Philo check-in/out
+
+- Types (`events.category`): `chapter_meeting` "Chapter", `philanthropy` "Philo
+  event", `social` "Social event", `party`, `general_social`, plus legacy
+  `other` (imported calendar default; not offered for new events).
+- Address search (`src/lib/geocode.ts`, `location-picker.tsx`): Photon
+  (komoot) type-ahead, free/no key, worldwide, biased to Bloomington. Replaced
+  Nominatim, whose policy forbids search-as-you-type. The picked result sets
+  the event's lat/lng, which is what check-in validates against.
+- **Philanthropy is strict**: `check_in()` refuses a second check-in (it would
+  reset the start time) and credits 0 hours; `check_out()` requires being
+  within the radius with a real GPS accuracy (<= 100 m), then credits hours =
+  time from check-in to check-out (quarter-hour floor, not past the event end,
+  capped at `events.hours` if set). Other types: check-out just records
+  when/where and never rejects. Never checking out = 0 hours for a Philo event.
+  (The earlier "auto check-out when you leave" idea was dropped on purpose.)
+
 ## No public sign-up (admin-created accounts)
 
 There is no sign-up form. `/login` is sign-in only. Accounts are created

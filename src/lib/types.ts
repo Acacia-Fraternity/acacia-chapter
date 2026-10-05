@@ -10,7 +10,13 @@ export interface Profile {
   created_at: string;
 }
 
-export type EventCategory = "chapter_meeting" | "social" | "philanthropy" | "other";
+export type EventCategory =
+  | "chapter_meeting"
+  | "philanthropy"
+  | "social"
+  | "party"
+  | "general_social"
+  | "other";
 
 export interface Event {
   id: string;

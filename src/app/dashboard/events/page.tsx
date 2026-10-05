@@ -182,11 +182,23 @@ export default async function EventsPage() {
                         <p className="text-sm text-acacia-green font-medium">
                           ✓ Checked in
                         </p>
+                        {event.category === "philanthropy" && (
+                          <p className="text-xs text-muted-foreground max-w-48 ml-auto">
+                            Check out before you leave — you have to be at the
+                            location, and your hours are the time you spent.
+                          </p>
+                        )}
                         <CheckOutButton eventId={event.id} />
                       </>
                     ) : checkin ? (
                       <p className="text-sm text-acacia-green font-medium">
                         ✓ Attended
+                        {event.category === "philanthropy" && (
+                          <span className="block text-xs font-normal">
+                            {Number(checkin.hours_earned)} hr
+                            {Number(checkin.hours_earned) === 1 ? "" : "s"} earned
+                          </span>
+                        )}
                         {checkin.checked_out_at && (
                           <span className="block text-xs text-muted-foreground font-normal">
                             out{" "}

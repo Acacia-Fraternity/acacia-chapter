@@ -1,40 +1,72 @@
 "use server";
 
-/**
- * Free geocoding via OpenStreetMap's Nominatim — no API key, but their usage
- * policy requires a real User-Agent and caps requests at ~1/sec, which is
- * far more than this app (a handful of admins creating events) will ever
- * need. Server-side only: Nominatim doesn't send CORS headers, so a direct
- * browser fetch would fail anyway.
- */
-export async function geocodeAddress(
-  address: string,
-): Promise<{ lat: number; lng: number; displayName: string } | null> {
-  const trimmed = address.trim();
-  if (!trimmed) return null;
+export interface AddressSuggestion {
+  label: string;
+  lat: number;
+  lng: number;
+}
 
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(trimmed)}`;
+// Bloomington — results near here rank first, but anywhere in the world is
+// still returned (a philanthropy event might be in Indianapolis, a formal in
+// Toronto).
+const BIAS = { lat: 39.1653, lng: -86.5264 };
 
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "Acacia-Chapter-App/1.0 (chapter attendance tracker)",
-    },
-  });
-
-  if (!response.ok) return null;
-
-  const results = (await response.json()) as {
-    lat: string;
-    lon: string;
-    display_name: string;
-  }[];
-
-  const first = results[0];
-  if (!first) return null;
-
-  return {
-    lat: Number(first.lat),
-    lng: Number(first.lon),
-    displayName: first.display_name,
+interface PhotonFeature {
+  geometry: { coordinates: [number, number] };
+  properties: {
+    name?: string;
+    housenumber?: string;
+    street?: string;
+    city?: string;
+    state?: string;
+    postcode?: string;
+    country?: string;
   };
+}
+
+/**
+ * Address/place type-ahead via Photon (komoot's OpenStreetMap geocoder) — free,
+ * no API key, and built for search-as-you-type, which Nominatim's usage policy
+ * explicitly forbids. Server-side so the browser never calls a third party
+ * directly. Callers must debounce.
+ */
+export async function searchAddresses(query: string): Promise<AddressSuggestion[]> {
+  const q = query.trim();
+  if (q.length < 3) return [];
+
+  const url =
+    `https://photon.komoot.io/api/?limit=6&lat=${BIAS.lat}&lon=${BIAS.lng}` +
+    `&q=${encodeURIComponent(q)}`;
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: { "User-Agent": "Acacia-Chapter-App/1.0 (chapter attendance tracker)" },
+    });
+  } catch {
+    return [];
+  }
+  if (!response.ok) return [];
+
+  const data = (await response.json()) as { features?: PhotonFeature[] };
+
+  const seen = new Set<string>();
+  const suggestions: AddressSuggestion[] = [];
+  for (const feature of data.features ?? []) {
+    const p = feature.properties;
+    const street = [p.housenumber, p.street].filter(Boolean).join(" ");
+    // Skip the name when it's just the street repeated.
+    const name = p.name && p.name !== p.street ? p.name : "";
+    const label = [name, street, p.city, p.state, p.postcode, p.country]
+      .filter(Boolean)
+      .join(", ");
+    if (!label || seen.has(label)) continue;
+    seen.add(label);
+    suggestions.push({
+      label,
+      lng: feature.geometry.coordinates[0],
+      lat: feature.geometry.coordinates[1],
+    });
+  }
+  return suggestions;
 }
