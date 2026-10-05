@@ -52,7 +52,17 @@ export async function createEvent(formData: FormData) {
       )
     : [];
 
+  const rsvpRequired = formData.get("rsvp_required") === "1";
+  const deadlineRaw = String(formData.get("rsvp_deadline") ?? "");
+  const rsvpDeadline =
+    rsvpRequired && deadlineRaw ? chapterWallTimeToIso(deadlineRaw) : null;
+  const assignedIds = Array.from(
+    new Set(formData.getAll("assigned_ids").map(String)),
+  ).filter((id) => uuid.test(id));
+
   const { data: created, error } = await supabase.from("events").insert({
+    rsvp_required: rsvpRequired,
+    rsvp_deadline: rsvpDeadline,
     name,
     description,
     address,
@@ -79,6 +89,16 @@ export async function createEvent(formData: FormData) {
       // creator asked for.
       await supabase.from("events").delete().eq("id", created.id);
       throw new Error(soberError.message);
+    }
+  }
+
+  if (assignedIds.length > 0) {
+    const { error: assignError } = await supabase
+      .from("event_assignments")
+      .insert(assignedIds.map((user_id) => ({ event_id: created.id, user_id })));
+    if (assignError) {
+      await supabase.from("events").delete().eq("id", created.id);
+      throw new Error(assignError.message);
     }
   }
 

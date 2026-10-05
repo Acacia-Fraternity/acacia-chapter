@@ -21,6 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: "Acacia",
     description: "Chapter attendance, involvement, and chat tracker",
+    manifest: `/manifest.webmanifest?icon=${icon === "icon-crest" ? "crest" : "mark"}`,
     // Setting `icons` here REPLACES Next's automatic <link rel="icon"> for
     // src/app/icon.svg, so the tab icon has to be declared explicitly or the
     // browser shows a blank globe. Safari ignores SVG favicons, hence the PNG.

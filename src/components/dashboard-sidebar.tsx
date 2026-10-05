@@ -10,6 +10,7 @@ import {
   BookOpen,
   Car,
   Home,
+  Trophy,
   Palette,
   ShieldCheck,
   Pin,
@@ -25,6 +26,7 @@ const NAV_LINKS = [
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
   { href: "/dashboard/chapter", label: "Chapter", icon: BookOpen },
   { href: "/dashboard/curriculum", label: "Curriculum", icon: TriangleIcon },
+  { href: "/dashboard/house-points", label: "House Points", icon: Trophy },
   { href: "/dashboard/house-presence", label: "House Presence", icon: Home },
   { href: "/dashboard/parking", label: "Parking", icon: Car },
 ];

@@ -22,6 +22,7 @@ import type {
   EventFeedback,
   EventPresence,
   EventSoberBrother,
+  EventAssignment,
   Profile,
   RsvpStatus,
 } from "@/lib/types";
@@ -67,6 +68,7 @@ export default async function EventsPage() {
     { data: feedback },
     { data: presence },
     { data: sober },
+    { data: assignments },
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user!.id).single<Profile>(),
     supabase.from("profiles").select("id, full_name"),
@@ -90,6 +92,7 @@ export default async function EventsPage() {
       .eq("user_id", user!.id)
       .returns<EventPresence[]>(),
     supabase.from("event_sober_brothers").select("*").returns<EventSoberBrother[]>(),
+    supabase.from("event_assignments").select("*").returns<EventAssignment[]>(),
   ]);
 
   const isAdmin = profile?.role === "admin";
@@ -152,6 +155,12 @@ export default async function EventsPage() {
           const soberNames = (sober ?? [])
             .filter((b) => b.event_id === event.id)
             .map((b) => nameById.get(b.user_id) ?? "Unknown");
+          const assignedIds = (assignments ?? [])
+            .filter((a) => a.event_id === event.id)
+            .map((a) => a.user_id);
+          const assignedToMe = assignedIds.includes(user!.id);
+          const rsvpClosed =
+            !!event.rsvp_deadline && new Date(event.rsvp_deadline) < new Date();
           const minutesOnSite = minutesByEvent.get(event.id) ?? 0;
           const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${
             event.address
@@ -232,6 +241,26 @@ export default async function EventsPage() {
                   </p>
                 )}
 
+                {assignedIds.length > 0 && (
+                  <details className="text-sm">
+                    <summary className="cursor-pointer">
+                      <span className="font-medium">Assigned:</span>{" "}
+                      <span className="text-muted">
+                        {assignedToMe ? "you and " : ""}
+                        {assignedToMe ? assignedIds.length - 1 : assignedIds.length}
+                        {assignedToMe ? " other" : ""} brother
+                        {(assignedToMe ? assignedIds.length - 1 : assignedIds.length) === 1 ? "" : "s"}
+                      </span>
+                    </summary>
+                    <p className="mt-1 text-xs text-muted">
+                      {assignedIds
+                        .map((id) => nameById.get(id) ?? "Unknown")
+                        .sort()
+                        .join(", ")}
+                    </p>
+                  </details>
+                )}
+
                 {minutesOnSite > 0 && (
                   <p className="text-xs text-acacia-green">
                     {minutesOnSite} min on site
@@ -282,6 +311,28 @@ export default async function EventsPage() {
                   )}
                 </div>
 
+                {event.rsvp_required && (
+                  <p className="text-sm">
+                    <span className="font-medium">RSVP required</span>
+                    {event.rsvp_deadline && (
+                      <span className={rsvpClosed ? "text-red-600" : "text-muted"}>
+                        {" "}
+                        · {rsvpClosed ? "closed" : "by"}{" "}
+                        {formatChapterTime(event.rsvp_deadline, {
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    )}
+                    {!myRsvp && !rsvpClosed && (
+                      <span className="text-acacia-blue"> · you haven&apos;t responded</span>
+                    )}
+                  </p>
+                )}
+
                 {status !== "closed" && (
                   <div className="flex flex-wrap items-center gap-2">
                     {RSVP_OPTIONS.map((opt) => (
@@ -291,7 +342,8 @@ export default async function EventsPage() {
                       >
                         <button
                           type="submit"
-                          className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                          disabled={rsvpClosed && !isAdmin}
+                          className={`rounded-full border px-3 py-1 text-xs font-medium disabled:opacity-50 ${
                             myRsvp?.status === opt.value
                               ? "border-acacia-gold bg-acacia-gold/25"
                               : "border-surface-border"

@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createEvent } from "./actions";
 import { LocationPicker } from "@/components/location-picker";
 import { EventTypeFields } from "@/components/event-type-fields";
+import { RsvpFields } from "@/components/rsvp-fields";
+import { AssigneePicker } from "@/components/assignee-picker";
 import type { Profile } from "@/lib/types";
 
 export default async function NewEventPage() {
@@ -28,6 +30,12 @@ export default async function NewEventPage() {
     .from("profiles")
     .select("id, full_name")
     .eq("is_pledge", false)
+    .order("full_name");
+
+  // Assignment, unlike the sober list, covers every brother including pledges.
+  const { data: allMembers } = await supabase
+    .from("profiles")
+    .select("id, full_name, is_pledge")
     .order("full_name");
 
   return (
@@ -93,6 +101,15 @@ export default async function NewEventPage() {
             />
           </div>
         </div>
+
+        <RsvpFields />
+
+        <AssigneePicker
+          members={(allMembers ?? []).map((m) => ({
+            id: m.id,
+            name: (m.full_name || "(no name)") + (m.is_pledge ? " (pledge)" : ""),
+          }))}
+        />
 
         <button
           type="submit"

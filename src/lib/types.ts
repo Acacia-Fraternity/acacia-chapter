@@ -28,6 +28,8 @@ export interface Event {
   radius_meters: number;
   hours: number;
   house_points: number;
+  rsvp_required: boolean;
+  rsvp_deadline: string | null;
   category: EventCategory;
   starts_at: string;
   ends_at: string;
@@ -106,6 +108,11 @@ export interface EventPresence {
 }
 
 export interface EventSoberBrother {
+  event_id: string;
+  user_id: string;
+}
+
+export interface EventAssignment {
   event_id: string;
   user_id: string;
 }

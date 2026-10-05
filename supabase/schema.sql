@@ -1278,6 +1278,53 @@ create policy "calendar editors manage sober brothers"
   on event_sober_brothers for all to authenticated
   using (can_edit_calendar()) with check (can_edit_calendar());
 
+-- RSVP-required events with an optional deadline. `create table if not exists`
+-- never touches the live events table, hence the explicit ALTERs.
+alter table events add column if not exists rsvp_required boolean not null default false;
+alter table events add column if not exists rsvp_deadline timestamptz;
+
+-- The "members manage their own rsvp" policy can't see the deadline, so a
+-- trigger refuses new/changed RSVPs once it has passed (admins may still
+-- fix one on someone's behalf).
+create or replace function enforce_rsvp_deadline()
+returns trigger
+language plpgsql
+as $$
+declare
+  deadline timestamptz;
+begin
+  select rsvp_deadline into deadline from events where id = new.event_id;
+  if deadline is not null and now() > deadline and not is_admin() then
+    raise exception 'The RSVP deadline for this event has passed';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists event_rsvps_deadline on event_rsvps;
+create trigger event_rsvps_deadline
+  before insert or update on event_rsvps
+  for each row execute function enforce_rsvp_deadline();
+
+-- Brothers assigned to (expected at) an event. No row = nobody assigned.
+-- Everyone can see who is assigned; only calendar editors set it.
+create table if not exists event_assignments (
+  event_id uuid not null references events (id) on delete cascade,
+  user_id uuid not null references profiles (id) on delete cascade,
+  primary key (event_id, user_id)
+);
+
+alter table event_assignments enable row level security;
+
+drop policy if exists "assignments are viewable by any signed-in member" on event_assignments;
+create policy "assignments are viewable by any signed-in member"
+  on event_assignments for select to authenticated using (true);
+
+drop policy if exists "calendar editors manage assignments" on event_assignments;
+create policy "calendar editors manage assignments"
+  on event_assignments for all to authenticated
+  using (can_edit_calendar()) with check (can_edit_calendar());
+
 -- ============================================================
 -- Bootstrap the first admin. Run this SEPARATELY, once, after you've
 -- signed up in the app yourself — replace the email below with yours.
