@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createEvent } from "./actions";
 import { LocationPicker } from "@/components/location-picker";
-import { EVENT_CATEGORIES } from "@/lib/event-category";
+import { EventTypeFields } from "@/components/event-type-fields";
 import type { Profile } from "@/lib/types";
 
 export default async function NewEventPage() {
@@ -47,7 +47,9 @@ export default async function NewEventPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Description</label>
+          <label className="block text-sm font-medium mb-1">
+            Description <span className="font-normal text-muted-foreground">(optional)</span>
+          </label>
           <textarea
             name="description"
             rows={2}
@@ -55,76 +57,9 @@ export default async function NewEventPage() {
           />
         </div>
 
+        <EventTypeFields />
+
         <LocationPicker />
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Type</label>
-          <select
-            name="category"
-            defaultValue="chapter_meeting"
-            className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
-          >
-            {EVENT_CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Philo events are strict: brothers must check in at the address and
-            check out there too, and service hours are the time actually spent
-            on site.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Check-in radius (meters)
-            </label>
-            <input
-              name="radius_meters"
-              type="number"
-              defaultValue={100}
-              min={5}
-              required
-              className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Service hours (max)
-            </label>
-            <input
-              name="hours"
-              type="number"
-              step="0.5"
-              min={0}
-              defaultValue={0}
-              className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Philo events only. Hours are earned by time on site (check-in to
-              check-out), up to this cap; leave 0 to cap at the event&apos;s
-              length. Ignored for other types.
-            </p>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">House points</label>
-          <input
-            name="house_points"
-            type="number"
-            min={0}
-            defaultValue={0}
-            className="w-full rounded-md border border-surface-border px-3 py-2 text-sm"
-          />
-          <p className="mt-1 text-xs text-muted-foreground">
-            Points a brother earns toward house points. Leave 0 if this event
-            isn&apos;t worth points.
-          </p>
-        </div>
 
         <div className="grid grid-cols-2 gap-2">
           <div>

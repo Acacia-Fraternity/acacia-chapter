@@ -63,3 +63,12 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* The native dropdown list is drawn by the browser on a white background by
+   default, but its options inherit the page's text colour — light text on
+   white in dark mode. Give both an explicit theme-aware pair. */
+select,
+option {
+  background-color: var(--surface);
+  color: var(--foreground);
+}

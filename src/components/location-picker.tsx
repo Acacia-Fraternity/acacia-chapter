@@ -2,8 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { searchAddresses, type AddressSuggestion } from "@/lib/geocode";
+import { HOUSE_LOCATION } from "@/lib/house-location";
 
 const DEBOUNCE_MS = 350;
+
+// The default for nearly every event; type in the box to search elsewhere.
+const HOUSE_PRESET = {
+  label: "702 E 3rd St, Bloomington, IN 47401",
+  lat: HOUSE_LOCATION.latitude,
+  lng: HOUSE_LOCATION.longitude,
+};
 
 export function LocationPicker() {
   const [query, setQuery] = useState("");
@@ -11,7 +19,7 @@ export function LocationPicker() {
   const [searching, setSearching] = useState(false);
   const [open, setOpen] = useState(false);
   const [chosen, setChosen] = useState<{ label: string; lat: number; lng: number } | null>(
-    null,
+    HOUSE_PRESET,
   );
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +90,7 @@ export function LocationPicker() {
         <input
           type="text"
           autoComplete="off"
-          placeholder="Start typing an address or place…"
+          placeholder="Search a different address or place…"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -127,20 +135,36 @@ export function LocationPicker() {
           )}
       </div>
 
-      <button
-        type="button"
-        onClick={useCurrentLocation}
-        className="text-xs text-muted hover:text-foreground underline"
-      >
-        {locating ? "Locating…" : "Or use my current location"}
-      </button>
+      <div className="flex gap-4">
+        {chosen !== HOUSE_PRESET && (
+          <button
+            type="button"
+            onClick={() => {
+              setChosen(HOUSE_PRESET);
+              setQuery("");
+              setSuggestions([]);
+              setError(null);
+            }}
+            className="text-xs text-muted hover:text-foreground underline"
+          >
+            Use the Acacia house
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={useCurrentLocation}
+          className="text-xs text-muted hover:text-foreground underline"
+        >
+          {locating ? "Locating…" : "Use my current location"}
+        </button>
+      </div>
 
       {error && <p className="text-xs text-red-600">{error}</p>}
 
       {chosen ? (
         <p className="text-xs text-acacia-green">
-          ✓ {chosen.label} ({chosen.lat.toFixed(5)}, {chosen.lng.toFixed(5)}) — people
-          can only check in within range of this spot.
+          ✓ {chosen === HOUSE_PRESET ? `Acacia house — ${chosen.label}` : chosen.label} —
+          people can only check in within range of this spot.
         </p>
       ) : (
         <p className="text-xs text-muted-foreground">

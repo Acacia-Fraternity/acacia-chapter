@@ -253,6 +253,10 @@ export default async function EventsPage() {
                       {event.house_points} house point
                       {event.house_points === 1 ? "" : "s"}
                     </span>
+                  ) : event.category === "philanthropy" ? (
+                    <span className="inline-block rounded-full bg-acacia-gold text-acacia-black px-2 py-0.5 text-xs font-medium">
+                      1 house point / hour
+                    </span>
                   ) : (
                     <span className="inline-block rounded-full bg-surface-border text-muted-foreground px-2 py-0.5 text-xs font-medium">
                       No house points

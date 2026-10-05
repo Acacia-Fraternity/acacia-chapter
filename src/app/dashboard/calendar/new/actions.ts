@@ -5,6 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { chapterWallTimeToIso } from "@/lib/chapter-time";
 import { EVENT_CATEGORIES } from "@/lib/event-category";
 
+// Same for every event: close enough that the GPS check means "you are
+// actually there" without failing people standing at the edge of a venue.
+const CHECK_IN_RADIUS_METERS = 100;
+
 export async function createEvent(formData: FormData) {
   const supabase = await createClient();
 
@@ -19,13 +23,15 @@ export async function createEvent(formData: FormData) {
   if (!latRaw || !lngRaw || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
     throw new Error("Pick an address from the suggestions so check-in knows where the event is");
   }
-  const radiusMeters = Number(formData.get("radius_meters"));
-  const hours = Number(formData.get("hours") ?? 0);
-  const housePoints = Math.max(0, Math.trunc(Number(formData.get("house_points") ?? 0)));
   const categoryRaw = String(formData.get("category") ?? "");
   const category = EVENT_CATEGORIES.some((c) => c.value === categoryRaw)
     ? categoryRaw
     : "other";
+  // The hours field only exists for Philo events; ignore it otherwise.
+  const hours =
+    category === "philanthropy"
+      ? Math.max(0, Number(formData.get("hours") ?? 0) || 0)
+      : 0;
   const startsAt = String(formData.get("starts_at"));
   const endsAt = String(formData.get("ends_at"));
 
@@ -41,9 +47,8 @@ export async function createEvent(formData: FormData) {
     address,
     latitude,
     longitude,
-    radius_meters: radiusMeters,
+    radius_meters: CHECK_IN_RADIUS_METERS,
     hours,
-    house_points: housePoints,
     category,
     starts_at: chapterWallTimeToIso(startsAt),
     ends_at: chapterWallTimeToIso(endsAt),
