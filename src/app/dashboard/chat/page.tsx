@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { ChatRoom } from "@/components/chat-room";
+import { ChatWatermark } from "@/components/chat-watermark";
 import { allowedKeys } from "@/lib/permissions";
 import type { Profile } from "@/lib/types";
 
@@ -65,6 +66,7 @@ export default async function ChatPage({
 
   return (
     <div className="flex flex-col h-[calc(100vh-6rem)]">
+      <ChatWatermark name={profile?.full_name || user!.email || "Member"} />
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <h1 className="text-lg font-semibold mr-2">Chat</h1>
         {channels.map((c) => (
