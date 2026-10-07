@@ -40,7 +40,8 @@ export function HouseMap({
   // changes, not on the minute refresh, or the map would jump while panning.
   const fittedForRef = useRef<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
 
   // Leaflet touches `window` on import, so it can only load in the browser.
   useEffect(() => {
@@ -120,7 +121,7 @@ export function HouseMap({
     }
 
     for (const member of members) {
-      if (selectedId && member.id !== selectedId) continue;
+      if (selected.size > 0 && !selected.has(member.id)) continue;
       const trail = points.filter((p) => p.user_id === member.id);
       if (trail.length === 0) continue;
 
@@ -160,44 +161,66 @@ export function HouseMap({
         .addTo(layer);
     }
 
-    const fitKey = selectedId ?? "all";
+    const fitKey = selected.size === 0 ? "all" : [...selected].sort().join(",");
     if (fittedForRef.current !== fitKey) {
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
       fittedForRef.current = fitKey;
     }
-  }, [ready, members, points, selectedId, house]);
+  }, [ready, members, points, selected, house]);
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex items-center gap-2 flex-wrap">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Find a brother…"
+          className="rounded-md border border-surface-border bg-transparent px-2 py-1 text-xs"
+        />
         <button
-          onClick={() => setSelectedId(null)}
+          onClick={() => setSelected(new Set())}
           className={`rounded-full border px-3 py-1 text-xs font-medium ${
-            selectedId === null
+            selected.size === 0
               ? "border-acacia-gold bg-acacia-gold/25"
               : "border-surface-border"
           }`}
         >
           Everyone
         </button>
-        {members.map((m) => (
-          <button
-            key={m.id}
-            onClick={() => setSelectedId(selectedId === m.id ? null : m.id)}
-            className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
-              selectedId === m.id
-                ? "border-acacia-gold bg-acacia-gold/25"
-                : "border-surface-border"
-            }`}
-          >
-            <span
-              className="h-2.5 w-2.5 rounded-full"
-              style={{ background: m.color }}
-            />
-            {m.name}
-            {m.isHome && <span className="text-acacia-green">· home</span>}
-          </button>
-        ))}
+        <button
+          onClick={() => setSelected(new Set(members.filter((m) => m.isHome).map((m) => m.id)))}
+          className="rounded-full border border-surface-border px-3 py-1 text-xs font-medium"
+        >
+          At the house now
+        </button>
+        {selected.size > 0 && (
+          <span className="text-xs text-muted-foreground">{selected.size} selected</span>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+        {members
+          .filter((m) => selected.has(m.id) || m.name.toLowerCase().includes(search.trim().toLowerCase()))
+          .map((m) => (
+            <button
+              key={m.id}
+              onClick={() =>
+                setSelected((prev) => {
+                  const next = new Set(prev);
+                  if (!next.delete(m.id)) next.add(m.id);
+                  return next;
+                })
+              }
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
+                selected.has(m.id)
+                  ? "border-acacia-gold bg-acacia-gold/25"
+                  : "border-surface-border"
+              }`}
+            >
+              <span className="h-2.5 w-2.5 rounded-full" style={{ background: m.color }} />
+              {m.name}
+              {m.isHome && <span className="text-acacia-green">· home</span>}
+            </button>
+          ))}
       </div>
       <div
         ref={containerRef}
