@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { PersonalizationForm } from "@/components/personalization-form";
+import { ChangePasswordForm } from "@/components/change-password-form";
 import { NotificationSettings } from "@/components/notification-settings";
 
 export default async function PersonalizationPage() {
@@ -24,6 +25,7 @@ export default async function PersonalizationPage() {
     <div className="space-y-8 max-w-md">
       <h1 className="text-lg font-semibold">Personalization</h1>
       <PersonalizationForm initialTheme={initialTheme} />
+      <ChangePasswordForm email={user!.email ?? ""} />
       <NotificationSettings
         userId={user!.id}
         initial={{
