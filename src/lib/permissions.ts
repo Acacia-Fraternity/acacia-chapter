@@ -53,7 +53,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { key: "pledgeship_schedule", label: "See the pledge schedule", group: "Pledgeship", path: null, defaults: { pledge: true, active: true, exec: true } },
   { key: "pledgeship_quizzes", label: "Use the pledge quizzes", group: "Pledgeship", path: null, defaults: { pledge: true, active: true, exec: true } },
   { key: "tab_house_points", label: "House Points", group: "House Points", path: "/dashboard/house-points", defaults: { pledge: true, active: true, exec: true } },
-  { key: "tab_house_presence", label: "House Presence", group: "House Presence", path: "/dashboard/house-presence", defaults: { pledge: true, active: true, exec: true } },
+  { key: "tab_house_presence", label: "House Presence", group: "House Presence", path: "/dashboard/house-presence", defaults: { pledge: false, active: false, exec: true } },
   { key: "house_map", label: "House Presence: location map", group: "House Presence", path: null, defaults: { pledge: true, active: true, exec: true } },
   { key: "house_range_day", label: "House Presence map: Last 24 hours", group: "House Presence", path: null, defaults: { pledge: true, active: true, exec: true } },
   { key: "house_range_week", label: "House Presence map: Last 7 days", group: "House Presence", path: null, defaults: { pledge: true, active: true, exec: true } },
