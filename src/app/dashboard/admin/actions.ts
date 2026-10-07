@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -98,6 +99,34 @@ export async function createMember(formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/dashboard/admin");
+}
+
+/**
+ * Passwords are hashed by Supabase and can't be read back, so "forgot my
+ * password" means setting a new one. The password is generated server-side and
+ * returned once for the admin to hand over. Service-role client again, so the
+ * admin check is the only gate.
+ */
+export async function resetMemberPassword(userId: string): Promise<string> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+
+  const { data: callerProfile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (callerProfile?.role !== "admin") throw new Error("Only admins can reset passwords");
+
+  const password = randomBytes(9).toString("base64url");
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(userId, { password });
+  if (error) throw new Error(error.message);
+
+  return password;
 }
 
 export interface BulkMemberRow {

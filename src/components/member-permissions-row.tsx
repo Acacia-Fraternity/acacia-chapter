@@ -9,6 +9,7 @@ import {
   setMemberCanEditCalendar,
   setMemberIsExec,
   setMemberOnPledgeCommittee,
+  resetMemberPassword,
 } from "@/app/dashboard/admin/actions";
 import type { Profile } from "@/lib/types";
 
@@ -23,6 +24,20 @@ export function MemberPermissionsRow({
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState<string | null>(null);
+
+  function handleReset() {
+    if (!window.confirm(`Set a new password for ${member.full_name || "this member"}? Their old one stops working.`)) return;
+    setError(null);
+    setNewPassword(null);
+    startTransition(async () => {
+      try {
+        setNewPassword(await resetMemberPassword(member.id));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Reset failed");
+      }
+    });
+  }
 
   function run(action: () => Promise<void>) {
     setError(null);
@@ -132,9 +147,24 @@ export function MemberPermissionsRow({
             <option value="member">member</option>
             <option value="admin">admin</option>
           </select>
+
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={handleReset}
+            className="rounded border border-surface-border px-1.5 py-0.5 text-xs disabled:opacity-50"
+          >
+            Reset password
+          </button>
         </div>
       </div>
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {newPassword && (
+        <p className="mt-1 text-xs text-acacia-green">
+          New password (share it directly, it won&apos;t be shown again):{" "}
+          <code>{newPassword}</code>
+        </p>
+      )}
     </li>
   );
 }
