@@ -107,7 +107,7 @@ export async function createMember(formData: FormData) {
  * returned once for the admin to hand over. Service-role client again, so the
  * admin check is the only gate.
  */
-export async function resetMemberPassword(userId: string): Promise<string> {
+export async function resetMemberPassword(userId: string, chosen?: string): Promise<string> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -121,7 +121,8 @@ export async function resetMemberPassword(userId: string): Promise<string> {
     .single();
   if (callerProfile?.role !== "admin") throw new Error("Only admins can reset passwords");
 
-  const password = randomBytes(9).toString("base64url");
+  const password = chosen?.trim() || randomBytes(9).toString("base64url");
+  if (password.length < 6) throw new Error("Password must be at least 6 characters");
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.updateUserById(userId, { password });
   if (error) throw new Error(error.message);

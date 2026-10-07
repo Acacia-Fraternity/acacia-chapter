@@ -25,6 +25,7 @@ export function MemberPermissionsRow({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState<string | null>(null);
+  const [customPassword, setCustomPassword] = useState("");
 
   function handleReset() {
     if (!window.confirm(`Set a new password for ${member.full_name || "this member"}? Their old one stops working.`)) return;
@@ -32,7 +33,8 @@ export function MemberPermissionsRow({
     setNewPassword(null);
     startTransition(async () => {
       try {
-        setNewPassword(await resetMemberPassword(member.id));
+        setNewPassword(await resetMemberPassword(member.id, customPassword));
+        setCustomPassword("");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Reset failed");
       }
@@ -148,6 +150,12 @@ export function MemberPermissionsRow({
             <option value="admin">admin</option>
           </select>
 
+          <input
+            value={customPassword}
+            onChange={(e) => setCustomPassword(e.target.value)}
+            placeholder="New password (blank = random)"
+            className="w-48 rounded border border-surface-border px-1.5 py-0.5 text-xs"
+          />
           <button
             type="button"
             disabled={isPending}
