@@ -2,6 +2,8 @@
 // event location picker and drawn on the House Presence map. Coordinates were
 // geocoded from OpenStreetMap (Photon), not typed from memory.
 // Not yet listed: Wells Quad and Collins LLC — the geocoder couldn't place them.
+import { HOUSE_LOCATION } from "@/lib/house-location";
+
 export type PlaceKind = "recreation" | "residence";
 
 export interface Place {
@@ -9,6 +11,33 @@ export interface Place {
   kind: PlaceKind;
   lat: number;
   lng: number;
+}
+
+// Same vicinity as the chapter house's geofence, so "at a hall" means the same
+// thing as "at the house".
+export const PLACE_RADIUS_METERS = 150;
+
+function distanceMeters(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const R = 6371000;
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const h =
+    Math.sin(rad(bLat - aLat) / 2) ** 2 +
+    Math.cos(rad(aLat)) * Math.cos(rad(bLat)) * Math.sin(rad(bLng - aLng) / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/** Name of the nearest place (house included) whose vicinity contains the point. */
+export function placeAt(lat: number, lng: number): string | null {
+  let best: { name: string; d: number } | null = null;
+  const candidates = [
+    { name: "the house", lat: HOUSE_LOCATION.latitude, lng: HOUSE_LOCATION.longitude },
+    ...PLACES,
+  ];
+  for (const c of candidates) {
+    const d = distanceMeters(lat, lng, c.lat, c.lng);
+    if (d <= PLACE_RADIUS_METERS && (!best || d < best.d)) best = { name: c.name, d };
+  }
+  return best?.name ?? null;
 }
 
 export const PLACES: Place[] = [

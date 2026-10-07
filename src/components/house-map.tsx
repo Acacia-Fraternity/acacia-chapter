@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Map as LeafletMap, LayerGroup } from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { PLACES } from "@/lib/places";
+import { PLACES, PLACE_RADIUS_METERS } from "@/lib/places";
 
 export interface MapMember {
   id: string;
@@ -109,6 +109,12 @@ export function HouseMap({
       .addTo(layer);
 
     for (const place of PLACES) {
+      L.circle([place.lat, place.lng], {
+        radius: PLACE_RADIUS_METERS,
+        color: place.kind === "recreation" ? "#d97706" : "#003d4c",
+        weight: 1,
+        fillOpacity: 0.08,
+      }).addTo(layer);
       L.circleMarker([place.lat, place.lng], {
         radius: 6,
         color: "#ffffff",

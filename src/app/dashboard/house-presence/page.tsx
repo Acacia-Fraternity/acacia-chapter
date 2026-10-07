@@ -6,6 +6,7 @@ import { PresenceToggle } from "@/components/presence-toggle";
 import { HouseMap, type MapPoint } from "@/components/house-map";
 import { HOUSE_LOCATION } from "@/lib/house-location";
 import { rotateLocationToken } from "./actions";
+import { placeAt } from "@/lib/places";
 import { allowedKeys } from "@/lib/permissions";
 import type { Profile, HousePresenceSession } from "@/lib/types";
 
@@ -161,6 +162,17 @@ export default async function HousePresencePage({
     at: r.recorded_at,
   }));
 
+  // Where each person's newest breadcrumb puts them, if it's recent and inside
+  // the house's or a residence hall's vicinity. Only as visible as the trail
+  // itself (RLS: own trail, or everyone's with view_all_locations).
+  const placeByUserId = new Map<string, string>();
+  for (const r of trailRows) {
+    if (now - new Date(r.recorded_at).getTime() > 30 * 60_000) continue;
+    const place = placeAt(r.latitude, r.longitude);
+    if (place) placeByUserId.set(r.user_id, place);
+    else placeByUserId.delete(r.user_id);
+  }
+
   const visibleMembers = (members ?? []).filter((m) => {
     if (filter === "away") return !currentlyHomeSet.has(m.id);
     if (filter === "pledges") return m.is_pledge;
@@ -273,6 +285,11 @@ export default async function HousePresencePage({
                 {member.is_pledge && (
                   <span className="rounded-full bg-acacia-gold/25 px-2 py-0.5 text-xs font-medium">
                     Pledge
+                  </span>
+                )}
+                {placeByUserId.has(member.id) && (
+                  <span className="rounded-full bg-acacia-green/15 px-2 py-0.5 text-xs font-medium">
+                    at {placeByUserId.get(member.id)}
                   </span>
                 )}
                 {!isHome && lastSeen && (
