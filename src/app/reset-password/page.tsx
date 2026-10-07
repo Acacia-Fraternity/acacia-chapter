@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AcaciaMark } from "@/components/acacia-mark";
@@ -11,6 +12,31 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [linkState, setLinkState] = useState<"checking" | "ready" | "invalid">("checking");
+
+  // The reset link only works in the browser that requested it (PKCE), and its
+  // code is single-use. Surface the real exchange error instead of letting
+  // updateUser fail later with a bare "Auth session missing!".
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        if (!cancelled) setLinkState("ready");
+        return;
+      }
+      const code = new URLSearchParams(window.location.search).get("code");
+      if (code) {
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        if (!cancelled && !exchangeError) return setLinkState("ready");
+        if (!cancelled && exchangeError) setError(exchangeError.message);
+      }
+      if (!cancelled) setLinkState("invalid");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,7 +65,22 @@ export default function ResetPasswordPage() {
           <h1 className="text-2xl font-bold">Set a new password</h1>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {linkState === "invalid" && (
+          <div className="space-y-3 text-center text-sm">
+            <p className="text-red-600">
+              This reset link is invalid or already used{error ? ` (${error})` : ""}. Links
+              are single-use and only work in the browser you requested them from.
+            </p>
+            <Link href="/forgot-password" className="underline">
+              Request a new link
+            </Link>
+          </div>
+        )}
+
+        <form
+          onSubmit={handleSubmit}
+          className={linkState === "ready" ? "space-y-4" : "hidden"}
+        >
           <div>
             <label className="block text-sm font-medium mb-1">New password</label>
             <input
