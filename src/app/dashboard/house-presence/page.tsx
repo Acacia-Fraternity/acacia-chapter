@@ -343,7 +343,7 @@ export default async function HousePresencePage({
               Set <span className="font-medium">Server URL</span> to{" "}
               <code className="break-all">{endpoint}</code>
             </li>
-            <li>Set frequency to 120 seconds (2 minutes) and turn the service on.</li>
+            <li>Set frequency to 180 seconds (3 minutes) and turn the service on.</li>
             <li>
               When asked, allow location <span className="font-medium">Always</span>{" "}
               (on iPhone also leave Precise Location on).
