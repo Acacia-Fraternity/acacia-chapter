@@ -36,7 +36,11 @@ export default async function HomePage() {
       .returns<Event[]>(),
   ]);
 
-  const firstName = (profile?.full_name || "").trim().split(/\s+/)[0] || "brother";
+  const firstName = (profile?.full_name || "").trim().split(/\s+/)[0];
+  // Pledges aren't brothers yet, so they get just their name.
+  const greeting = profile?.is_pledge
+    ? `Hello, ${firstName || "there"}`
+    : `Hello, brother ${firstName}`.trim();
 
   return (
     <div className="space-y-8">
