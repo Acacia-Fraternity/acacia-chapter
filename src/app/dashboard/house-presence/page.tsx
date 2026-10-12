@@ -182,19 +182,31 @@ export default async function HousePresencePage({
 
   const host = (await headers()).get("host") ?? "your-app-domain";
   const protocol = host.startsWith("localhost") ? "http" : "https";
+  const setupOnly = !allowed.has("house_map") && !allowed.has("house_roster");
   const endpoint = `${protocol}://${host}/api/location`;
 
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-lg font-semibold">House Presence</h1>
-        <p className="text-sm text-muted-foreground">
-          {homeCount} of {members?.length ?? 0} at the house right now. Brothers
-          who set up always-on tracking below are tracked continuously;
-          everyone else is only counted while the app is open near the house
-          (use &quot;I&apos;m home&quot;/&quot;I&apos;m leaving&quot; to cover
-          the gaps).
-        </p>
+        {setupOnly ? (
+          <>
+            <h1 className="text-lg font-semibold">Location sharing</h1>
+            <p className="text-sm text-muted-foreground">
+              Follow the steps below to share your location with the chapter.
+            </p>
+          </>
+        ) : (
+          <>
+            <h1 className="text-lg font-semibold">House Presence</h1>
+            <p className="text-sm text-muted-foreground">
+              {homeCount} of {members?.length ?? 0} at the house right now. Brothers
+              who set up always-on tracking below are tracked continuously;
+              everyone else is only counted while the app is open near the house
+              (use &quot;I&apos;m home&quot;/&quot;I&apos;m leaving&quot; to cover
+              the gaps).
+            </p>
+          </>
+        )}
       </div>
 
       {allowed.has("house_map") && (
@@ -319,7 +331,7 @@ export default async function HousePresencePage({
       )}
 
       {allowed.has("house_tracking_setup") && (
-      <details className="rounded-lg border border-surface-border p-3 text-sm">
+      <details open={setupOnly} className="rounded-lg border border-surface-border p-3 text-sm">
         <summary className="cursor-pointer font-medium">
           Set up always-on tracking on your phone
         </summary>
