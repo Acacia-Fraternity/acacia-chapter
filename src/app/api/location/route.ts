@@ -161,7 +161,7 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  await logAttempt(admin, "recorded", `accuracy=${fix.accuracy}`);
+  // Successes aren't logged: that was ~3 extra queries on every ping.
   return NextResponse.json({ ok: true });
 }
 
