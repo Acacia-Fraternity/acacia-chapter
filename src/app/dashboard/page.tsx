@@ -42,7 +42,7 @@ export default async function HomePage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold">
-          Hello, brother {firstName}
+          {greeting}
         </h1>
         <p className="text-sm text-muted">Here&apos;s what&apos;s going on.</p>
       </div>
