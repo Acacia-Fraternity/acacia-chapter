@@ -547,3 +547,14 @@ three different free-tier ownership models:
   middleware.ts) and hidden in the sidebar. To add a permission: add it to the catalog,
   add the seed rows, and hook it into a policy/page. A role comes from the profile flags
   (`is_pledge` -> pledge, `is_exec` -> exec, else active).
+
+## Tracker health (Admin page)
+
+`/api/location` calls `note_tracker_ping()` on every authenticated ping, which
+upserts `tracker_status` (last ping, last accepted, last accuracy, why it was
+rejected) and, when more than 20 min passed since the previous ping, inserts a
+`tracker_outages` row (went quiet -> resumed; pruned after 60 days). Kept in
+their own admin-readable tables on purpose: `location_tokens` holds the bearer
+secret and must never get an admin read policy. "Down" in the UI is the same
+20 min (`src/lib/tracker-health.ts` must match the SQL). Phones that are off or
+out of signal also show as down; it can't tell those from a misconfigured app.

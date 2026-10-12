@@ -1934,6 +1934,80 @@ $$;
 grant execute on function spawn_due_polls() to authenticated, service_role;
 
 -- ============================================================
+-- Tracker health (Admin page). One row per member who has ever pinged
+-- /api/location, plus a row per gap in their pings. Deliberately NOT
+-- columns on location_tokens: admins may read this table, and that table
+-- holds the bearer secret that lets its holder report a member's location.
+-- Written only by the service role via note_tracker_ping() (the route).
+-- ============================================================
+create table if not exists tracker_status (
+  user_id uuid primary key references profiles (id) on delete cascade,
+  first_ping_at timestamptz not null default now(),
+  last_ping_at timestamptz not null default now(),
+  last_accepted_at timestamptz,
+  last_accuracy double precision,
+  -- Why the newest ping was not recorded (null = it was): "low-accuracy" or "too-old".
+  last_issue text
+);
+
+alter table tracker_status enable row level security;
+drop policy if exists "admins read tracker status" on tracker_status;
+create policy "admins read tracker status"
+  on tracker_status for select to authenticated
+  using (is_admin());
+
+create table if not exists tracker_outages (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references profiles (id) on delete cascade,
+  went_quiet_at timestamptz not null,
+  resumed_at timestamptz not null
+);
+create index if not exists tracker_outages_user_resumed
+  on tracker_outages (user_id, resumed_at desc);
+
+alter table tracker_outages enable row level security;
+drop policy if exists "admins read tracker outages" on tracker_outages;
+create policy "admins read tracker outages"
+  on tracker_outages for select to authenticated
+  using (is_admin());
+
+-- A gap longer than 20 minutes between two pings counts as the tracker being
+-- down. The Admin page uses the same figure (src/lib/tracker-health.ts).
+create or replace function note_tracker_ping(
+  p_user uuid,
+  p_accuracy double precision,
+  p_issue text
+)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_prev timestamptz;
+begin
+  select last_ping_at into v_prev from tracker_status where user_id = p_user for update;
+
+  if v_prev is not null and now() - v_prev > interval '20 minutes' then
+    insert into tracker_outages (user_id, went_quiet_at, resumed_at)
+    values (p_user, v_prev, now());
+    delete from tracker_outages
+    where user_id = p_user and resumed_at < now() - interval '60 days';
+  end if;
+
+  insert into tracker_status (user_id, last_ping_at, last_accepted_at, last_accuracy, last_issue)
+  values (p_user, now(), case when p_issue is null then now() end, p_accuracy, p_issue)
+  on conflict (user_id) do update set
+    last_ping_at = now(),
+    last_accepted_at = case when p_issue is null then now() else tracker_status.last_accepted_at end,
+    last_accuracy = p_accuracy,
+    last_issue = p_issue;
+end;
+$$;
+
+revoke execute on function note_tracker_ping(uuid, double precision, text) from public, anon, authenticated;
+grant execute on function note_tracker_ping(uuid, double precision, text) to service_role;
+
+-- ============================================================
 -- Bootstrap the first admin. Run this SEPARATELY, once, after you've
 -- signed up in the app yourself — replace the email below with yours.
 -- Every future admin promotion after this one can be done the same

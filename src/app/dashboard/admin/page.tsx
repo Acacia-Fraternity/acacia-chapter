@@ -6,7 +6,8 @@ import { MemberPermissionsRow } from "@/components/member-permissions-row";
 import { AddMemberForm } from "@/components/add-member-form";
 import { BulkAddMembers } from "@/components/bulk-add-members";
 import { RoleAccessMatrix } from "@/components/role-access-matrix";
-import type { Event, Profile, Checkin } from "@/lib/types";
+import { TrackerHealth } from "@/components/tracker-health";
+import type { Event, Profile, Checkin, TrackerStatus, TrackerOutage } from "@/lib/types";
 
 export default async function AdminPage() {
   const supabase = await createClient();
@@ -40,6 +41,18 @@ export default async function AdminPage() {
     .from("checkins")
     .select("*")
     .returns<Checkin[]>();
+
+  const { data: trackerStatuses } = await supabase
+    .from("tracker_status")
+    .select("*")
+    .returns<TrackerStatus[]>();
+
+  const { data: trackerOutages } = await supabase
+    .from("tracker_outages")
+    .select("*")
+    .order("resumed_at", { ascending: false })
+    .limit(500)
+    .returns<TrackerOutage[]>();
 
   const hoursByUserId = new Map<string, number>();
   const checkinStatsByEventId = new Map<string, { total: number; flagged: number }>();
@@ -76,6 +89,16 @@ export default async function AdminPage() {
       <section className="space-y-3">
         <h2 className="text-sm font-medium text-muted">Role access</h2>
         <RoleAccessMatrix stored={rolePerms ?? []} />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-sm font-medium text-muted">Location tracker health</h2>
+        <TrackerHealth
+          members={members ?? []}
+          statuses={trackerStatuses ?? []}
+          outages={trackerOutages ?? []}
+          nowMs={new Date().getTime()}
+        />
       </section>
 
       <section className="space-y-3">

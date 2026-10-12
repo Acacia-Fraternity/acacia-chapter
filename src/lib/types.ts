@@ -219,3 +219,19 @@ export interface PollSchedule {
   close_previous: boolean;
   active: boolean;
 }
+
+export interface TrackerStatus {
+  user_id: string;
+  first_ping_at: string;
+  last_ping_at: string;
+  last_accepted_at: string | null;
+  last_accuracy: number | null;
+  last_issue: "low-accuracy" | "too-old" | null;
+}
+
+export interface TrackerOutage {
+  id: number;
+  user_id: string;
+  went_quiet_at: string;
+  resumed_at: string;
+}

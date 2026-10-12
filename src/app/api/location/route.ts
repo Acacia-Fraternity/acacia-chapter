@@ -137,12 +137,27 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ error: "Unknown token" }, { status: 401 });
   }
 
+  // Feeds the Admin page's tracker health. Best-effort: monitoring must
+  // never be the reason a ping is dropped.
+  const noteTracker = async (issue: "low-accuracy" | "too-old" | null) => {
+    try {
+      await admin.rpc("note_tracker_ping", {
+        p_user: owner.user_id,
+        p_accuracy: fix.accuracy,
+        p_issue: issue,
+      });
+    } catch {
+      // ignore
+    }
+  };
+
   // Ignored fixes still return 200 so the tracker app doesn't retry them forever.
   const tooOld =
     fix.timestampSeconds !== null &&
     Date.now() / 1000 - fix.timestampSeconds > MAX_AGE_SECONDS;
   const tooVague = fix.accuracy !== null && fix.accuracy > MAX_ACCURACY_METERS;
   if (tooOld || tooVague) {
+    await noteTracker(tooOld ? "too-old" : "low-accuracy");
     await logAttempt(
       admin,
       tooOld ? "ignored-too-old" : "ignored-low-accuracy",
@@ -161,6 +176,7 @@ async function handle(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  await noteTracker(null);
   // Successes aren't logged: that was ~3 extra queries on every ping.
   return NextResponse.json({ ok: true });
 }
