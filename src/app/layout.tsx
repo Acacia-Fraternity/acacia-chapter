@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Archivo } from "next/font/google";
+import { Archivo, EB_Garamond } from "next/font/google";
 import { cookies } from "next/headers";
 import "./globals.css";
 
@@ -12,6 +12,15 @@ const archivo = Archivo({
   variable: "--font-archivo",
   subsets: ["latin"],
   weight: ["500", "600", "700"],
+});
+
+// Chapter letters are carved in classical Roman-style serif capitals. Only the
+// Greek subset is loaded, so this family covers Greek characters and anything
+// else (the Latin text) falls through to Archivo.
+const greekLetters = EB_Garamond({
+  variable: "--font-greek",
+  subsets: ["greek"],
+  weight: ["600"],
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -40,7 +49,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       data-theme={dataTheme}
-      className={`${archivo.variable} h-full antialiased`}
+      className={`${archivo.variable} ${greekLetters.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans bg-background text-foreground">
         {children}

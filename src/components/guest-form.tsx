@@ -228,6 +228,7 @@ export function GuestForm({
             className={field}
             required
             value={v.house}
+            style={{ fontFamily: "var(--font-greek), var(--font-archivo), sans-serif" }}
             onChange={(e) => set("house", e.target.value)}
           >
             <option value="">Select…</option>
