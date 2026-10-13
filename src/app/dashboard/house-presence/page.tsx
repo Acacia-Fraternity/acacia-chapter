@@ -373,6 +373,42 @@ export default async function HousePresencePage({
               a minute or two.
             </li>
           </ol>
+          <div className="rounded-md border border-surface-border p-3 space-y-2">
+            <p className="font-medium text-foreground">Keep it running (do these too)</p>
+            <p className="text-xs">
+              If your phone is set up right it keeps sending even when the app
+              is closed. These are the usual reasons it stops:
+            </p>
+            <p className="text-xs font-medium">iPhone</p>
+            <ul className="list-disc pl-5 space-y-1 text-xs">
+              <li>
+                Settings → Traccar Client → Location: <b>Always</b>, and{" "}
+                <b>Precise Location</b> on.
+              </li>
+              <li>
+                Settings → General → Background App Refresh: on, and on for
+                Traccar Client.
+              </li>
+              <li>
+                Turn off <b>Low Power Mode</b> (it pauses background location).
+              </li>
+              <li>
+                Don&apos;t swipe Traccar Client away in the app switcher. Leave
+                it open in the background.
+              </li>
+              <li>Keep Continuous tracking switched on.</li>
+            </ul>
+            <p className="text-xs font-medium">Android</p>
+            <ul className="list-disc pl-5 space-y-1 text-xs">
+              <li>Location permission: <b>Allow all the time</b>, Precise on.</li>
+              <li>
+                Battery for Traccar Client: <b>Unrestricted</b> (not
+                &quot;Optimized&quot;), and take it off any &quot;sleeping
+                apps&quot; list.
+              </li>
+              <li>Keep Continuous tracking switched on.</li>
+            </ul>
+          </div>
           <div>
             <p className="text-xs">Your personal code (treat it like a password):</p>
             <code className="block break-all rounded-md bg-surface-border px-2 py-1 text-xs">
