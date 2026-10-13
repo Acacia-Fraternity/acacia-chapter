@@ -355,10 +355,22 @@ export default async function HousePresencePage({
               Set <span className="font-medium">Server URL</span> to{" "}
               <code className="break-all">{endpoint}</code>
             </li>
-            <li>Set <span className="font-medium">Stationary heartbeat</span> to 180 seconds (3 minutes), leave the other settings as they are, and turn the service on.</li>
+            <li>Set <span className="font-medium">Stationary heartbeat</span> to 180 seconds (3 minutes) and leave the other settings as they are.</li>
+            <li>
+              Go back to the main screen and turn on{" "}
+              <span className="font-medium">Continuous tracking</span>. Nothing
+              is sent until this switch is on.
+            </li>
             <li>
               When asked, allow location <span className="font-medium">Always</span>{" "}
-              (on iPhone also leave Precise Location on).
+              (on iPhone also leave Precise Location on). If it only offers
+              &quot;While Using,&quot; pick that, then open Settings → Traccar
+              Client → Location and change it to Always.
+            </li>
+            <li>
+              Tap <span className="font-medium">Send location</span> once to
+              test. You should show up on the chapter&apos;s tracker list within
+              a minute or two.
             </li>
           </ol>
           <div>
