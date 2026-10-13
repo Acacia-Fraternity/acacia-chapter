@@ -24,7 +24,7 @@ type PledgeTab = "schedule" | "quizzes" | "hometowns";
 function Tabs({ tab, canSchedule }: { tab: PledgeTab; canSchedule: boolean }) {
   const tabs: [PledgeTab, string][] = [
     ...(canSchedule ? ([["schedule", "Schedule"]] as [PledgeTab, string][]) : []),
-    ["quizzes", "Quizzes"],
+    ["quizzes", "Pythagoras"],
     ["hometowns", "Hometowns"],
   ];
   return (
