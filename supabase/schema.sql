@@ -2036,7 +2036,10 @@ create table if not exists party_guests (
   created_at timestamptz not null default now()
 );
 
-create unique index if not exists party_guests_unique_name
+-- Same-name guests are allowed (two different people can share a name); the
+-- form warns and asks before adding a duplicate. This used to be a unique index.
+drop index if exists party_guests_unique_name;
+create index if not exists party_guests_event_name
   on party_guests (event_id, lower(first_name), lower(last_name));
 create index if not exists party_guests_event on party_guests (event_id);
 

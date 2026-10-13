@@ -150,6 +150,16 @@ export default async function GuestListsPage({
     canEdit: canManage || (g.added_by === user!.id && !closed),
   }));
 
+  const existing = rows.map((g) => ({
+    id: g.id,
+    firstName: g.firstName,
+    lastName: g.lastName,
+    gender: g.gender,
+    house: g.house,
+    relationship: g.relationship,
+    referralName: g.referralName,
+  }));
+
   // Analytics
   const total = guests.length;
   const female = guests.filter((g) => g.gender === "female").length;
@@ -310,6 +320,7 @@ export default async function GuestListsPage({
                 previous={previous}
                 referrals={referrals}
                 myId={user!.id}
+                existing={existing}
               />
             </div>
           ) : (
@@ -336,6 +347,7 @@ export default async function GuestListsPage({
                     previous={previous}
                     referrals={referrals}
                     myId={user!.id}
+                    existing={existing}
                   />
                 ))}
               </ul>

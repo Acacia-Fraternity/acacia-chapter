@@ -2,7 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { removeGuest, setGuestCheckedIn } from "@/app/dashboard/guest-lists/actions";
-import { GuestForm, type GuestFormValues, type PreviousGuest } from "@/components/guest-form";
+import {
+  GuestForm,
+  type ExistingGuest,
+  type GuestFormValues,
+  type PreviousGuest,
+} from "@/components/guest-form";
 
 export interface GuestRowData extends GuestFormValues {
   id: string;
@@ -21,6 +26,7 @@ export function GuestRow({
   previous,
   referrals,
   myId,
+  existing,
 }: {
   guest: GuestRowData;
   eventId: string;
@@ -29,6 +35,7 @@ export function GuestRow({
   previous: PreviousGuest[];
   referrals: { id: string; name: string }[];
   myId: string;
+  existing?: ExistingGuest[];
 }) {
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +62,7 @@ export function GuestRow({
           previous={previous}
           referrals={referrals}
           myId={myId}
+          existing={existing}
           onDone={() => setEditing(false)}
         />
       </li>

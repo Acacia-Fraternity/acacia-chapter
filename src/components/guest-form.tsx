@@ -19,6 +19,16 @@ export interface PreviousGuest {
   relationship: string;
 }
 
+export interface ExistingGuest {
+  id: string;
+  firstName: string;
+  lastName: string;
+  gender: string;
+  house: string;
+  relationship: string;
+  referralName: string;
+}
+
 export interface GuestFormValues {
   firstName: string;
   lastName: string;
@@ -41,6 +51,7 @@ export function GuestForm({
   previous,
   referrals,
   myId,
+  existing = [],
   onDone,
 }: {
   eventId: string;
@@ -49,6 +60,8 @@ export function GuestForm({
   previous: PreviousGuest[];
   referrals: { id: string; name: string }[];
   myId: string;
+  /** Guests already on this party's list, for the duplicate-name warning. */
+  existing?: ExistingGuest[];
   onDone?: () => void;
 }) {
   const [v, setV] = useState<GuestFormValues>(
@@ -62,6 +75,7 @@ export function GuestForm({
     },
   );
   const [open, setOpen] = useState(false);
+  const [dupes, setDupes] = useState<ExistingGuest[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const boxRef = useRef<HTMLDivElement>(null);
@@ -101,6 +115,23 @@ export function GuestForm({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
+    const first = v.firstName.trim().toLowerCase();
+    const last = v.lastName.trim().toLowerCase();
+    const same = existing.filter(
+      (g) =>
+        g.id !== guestId &&
+        g.firstName.toLowerCase() === first &&
+        g.lastName.toLowerCase() === last,
+    );
+    if (same.length > 0) {
+      setDupes(same);
+      return;
+    }
+    save();
+  }
+
+  function save() {
+    setDupes(null);
     setError(null);
     startTransition(async () => {
       try {
@@ -258,6 +289,51 @@ export function GuestForm({
         </div>
       </div>
 
+      {dupes && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        >
+          <div className="w-full max-w-sm space-y-3 rounded-lg border border-surface-border bg-surface p-5 shadow-xl">
+            <p className="font-semibold">
+              {v.firstName.trim()} {v.lastName.trim()} is already on the list
+            </p>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {dupes.map((d) => (
+                <li key={d.id}>
+                  {[
+                    d.house,
+                    d.gender,
+                    d.relationship && `${d.relationship} of ${d.referralName}`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </li>
+              ))}
+            </ul>
+            <p className="text-sm">
+              Different {v.firstName.trim()} {v.lastName.trim()}? Add anyway?
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={save}
+                className="rounded-md bg-acacia-gold px-4 py-2 text-sm font-semibold text-acacia-black"
+              >
+                Add anyway
+              </button>
+              <button
+                type="button"
+                onClick={() => setDupes(null)}
+                className="rounded-md border border-surface-border px-4 py-2 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {error && <p className="text-xs text-red-600">{error}</p>}
       <div className="flex gap-2">
         <button
