@@ -9,14 +9,10 @@ export function GuestDoorList({
   rows,
   eventId,
   previous,
-  referrals,
-  myId,
 }: {
   rows: GuestRowData[];
   eventId: string;
   previous: PreviousGuest[];
-  referrals: { id: string; name: string }[];
-  myId: string;
 }) {
   const [q, setQ] = useState("");
   const needle = q.trim().toLowerCase();
@@ -44,8 +40,6 @@ export function GuestDoorList({
               door
               canCheckIn
               previous={previous}
-              referrals={referrals}
-              myId={myId}
             />
           ))}
         </ul>

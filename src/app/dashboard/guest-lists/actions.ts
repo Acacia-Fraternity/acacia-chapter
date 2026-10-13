@@ -13,7 +13,6 @@ export interface GuestInput {
   gender: string;
   relationship: string;
   house: string;
-  referralId: string;
 }
 
 async function rpc(fn: string, args: Record<string, unknown>) {
@@ -27,14 +26,14 @@ function guestArgs(g: GuestInput) {
   if (!g.firstName.trim() || !g.lastName.trim()) throw new Error("First and last name are required");
   if (!["female", "male", "other"].includes(g.gender)) throw new Error("Pick a gender");
   if (!g.house) throw new Error("Pick a house affiliation");
-  if (!g.referralId) throw new Error("Pick the active referral");
   return {
     p_first: g.firstName,
     p_last: g.lastName,
     p_gender: g.gender,
     p_relationship: g.relationship,
     p_house: g.house,
-    p_referral: g.referralId,
+    // Null = the signed-in brother on add, unchanged on edit.
+    p_referral: null,
   };
 }
 

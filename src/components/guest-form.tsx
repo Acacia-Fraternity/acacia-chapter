@@ -35,7 +35,6 @@ export interface GuestFormValues {
   gender: string;
   relationship: string;
   house: string;
-  referralId: string;
 }
 
 const field = "w-full rounded-md border border-surface-border bg-surface px-3 py-2 text-sm";
@@ -49,8 +48,6 @@ export function GuestForm({
   guestId,
   initial,
   previous,
-  referrals,
-  myId,
   existing = [],
   onDone,
 }: {
@@ -58,8 +55,6 @@ export function GuestForm({
   guestId?: string;
   initial?: GuestFormValues;
   previous: PreviousGuest[];
-  referrals: { id: string; name: string }[];
-  myId: string;
   /** Guests already on this party's list, for the duplicate-name warning. */
   existing?: ExistingGuest[];
   onDone?: () => void;
@@ -71,7 +66,6 @@ export function GuestForm({
       gender: "",
       relationship: "",
       house: "",
-      referralId: myId,
     },
   );
   const [open, setOpen] = useState(false);
@@ -144,7 +138,6 @@ export function GuestForm({
             gender: "",
             relationship: "",
             house: "",
-            referralId: v.referralId,
           });
         }
         onDone?.();
@@ -271,22 +264,6 @@ export function GuestForm({
             ))}
           </select>
         </div>
-        <div>
-          <label className={label}>Active referral</label>
-          <select
-            className={field}
-            required
-            value={v.referralId}
-            onChange={(e) => set("referralId", e.target.value)}
-          >
-            {referrals.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-                {r.id === myId ? " (me)" : ""}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
 
       {dupes && (
@@ -305,7 +282,8 @@ export function GuestForm({
                   {[
                     d.house,
                     d.gender,
-                    d.relationship && `${d.relationship} of ${d.referralName}`,
+                    d.relationship,
+                    `Referral: ${d.referralName}`,
                   ]
                     .filter(Boolean)
                     .join(" · ")}

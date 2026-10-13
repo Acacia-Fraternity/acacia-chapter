@@ -115,9 +115,6 @@ export default async function GuestListsPage({
     allowed.has("check_in_guests") || canManage || (assignment ?? []).length > 0;
 
   const nameById = new Map((members ?? []).map((m) => [m.id, m.full_name || "Unnamed"]));
-  const referrals = (members ?? [])
-    .filter((m) => !m.is_pledge)
-    .map((m) => ({ id: m.id, name: m.full_name || "Unnamed" }));
 
   const seen = new Set<string>();
   const previous: PreviousGuest[] = [];
@@ -144,7 +141,6 @@ export default async function GuestListsPage({
     gender: g.gender,
     relationship: g.relationship,
     house: g.house,
-    referralId: g.referral_id ?? user!.id,
     referralName: g.referral_id ? (nameById.get(g.referral_id) ?? "a brother") : "a brother",
     checkedInAt: g.checked_in_at,
     canEdit: canManage || (g.added_by === user!.id && !closed),
@@ -318,8 +314,6 @@ export default async function GuestListsPage({
               <GuestForm
                 eventId={event.id}
                 previous={previous}
-                referrals={referrals}
-                myId={user!.id}
                 existing={existing}
               />
             </div>
@@ -345,8 +339,6 @@ export default async function GuestListsPage({
                     door={false}
                     canCheckIn={false}
                     previous={previous}
-                    referrals={referrals}
-                    myId={user!.id}
                     existing={existing}
                   />
                 ))}
@@ -366,8 +358,6 @@ export default async function GuestListsPage({
             rows={rows}
             eventId={event.id}
             previous={previous}
-            referrals={referrals}
-            myId={user!.id}
           />
         </div>
       )}

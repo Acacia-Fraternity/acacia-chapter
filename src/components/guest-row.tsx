@@ -24,8 +24,6 @@ export function GuestRow({
   door,
   canCheckIn,
   previous,
-  referrals,
-  myId,
   existing,
 }: {
   guest: GuestRowData;
@@ -33,8 +31,6 @@ export function GuestRow({
   door: boolean;
   canCheckIn: boolean;
   previous: PreviousGuest[];
-  referrals: { id: string; name: string }[];
-  myId: string;
   existing?: ExistingGuest[];
 }) {
   const [editing, setEditing] = useState(false);
@@ -60,8 +56,6 @@ export function GuestRow({
           guestId={guest.id}
           initial={guest}
           previous={previous}
-          referrals={referrals}
-          myId={myId}
           existing={existing}
           onDone={() => setEditing(false)}
         />
@@ -85,7 +79,8 @@ export function GuestRow({
           {[
             guest.house,
             guest.gender,
-            guest.relationship && `${guest.relationship} of ${guest.referralName}`,
+            guest.relationship,
+            `Referral: ${guest.referralName}`,
           ]
             .filter(Boolean)
             .join(" · ")}
