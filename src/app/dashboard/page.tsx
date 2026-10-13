@@ -75,6 +75,8 @@ export default async function HomePage() {
         <TaskList initialTasks={tasks ?? []} />
       </section>
 
+      {/* Pledges don't see the events list on Home. */}
+      {!profile?.is_pledge && (
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-muted">Upcoming events</h2>
@@ -114,6 +116,7 @@ export default async function HomePage() {
           ))}
         </ul>
       </section>
+      )}
     </div>
   );
 }
