@@ -98,7 +98,7 @@ export function TrackerHealth({
                   `Last ping ${when(status.last_ping_at)} was ignored: ${
                     status.last_issue === "low-accuracy"
                       ? `GPS accuracy ±${Math.round(status.last_accuracy ?? 0)} m (needs 150 m or better — Precise Location off?)`
-                      : "the fix was more than 10 minutes old when it arrived"
+                      : "the fix was more than 30 minutes old when it arrived"
                   }.`}
                 {state === "down" &&
                   status &&

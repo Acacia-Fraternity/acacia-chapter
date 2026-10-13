@@ -14,9 +14,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // this route is public to the middleware and authenticates itself.
 
 const MAX_ACCURACY_METERS = 150;
-// Trackers buffer pings while offline and flush them later; a replayed old
-// fix must not be recorded as "here right now".
-const MAX_AGE_SECONDS = 10 * 60;
+// Trackers buffer pings while offline or asleep and flush them later. The fix
+// is recorded as "here now", so a long-stale one must not be: 30 min covers a
+// phone that dozed between heartbeats without crediting a place someone left.
+const MAX_AGE_SECONDS = 30 * 60;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface Fix {
