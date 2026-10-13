@@ -235,3 +235,18 @@ export interface TrackerOutage {
   went_quiet_at: string;
   resumed_at: string;
 }
+
+export interface PartyGuest {
+  id: string;
+  event_id: string;
+  first_name: string;
+  last_name: string;
+  gender: "female" | "male" | "other";
+  relationship: string;
+  house: string;
+  referral_id: string | null;
+  added_by: string | null;
+  checked_in_at: string | null;
+  checked_in_by: string | null;
+  created_at: string;
+}

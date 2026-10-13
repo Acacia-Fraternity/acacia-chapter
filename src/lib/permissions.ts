@@ -65,6 +65,9 @@ export const PERMISSIONS: PermissionDef[] = [
   { key: "view_all_locations", label: "See everyone's location history", group: "House Presence", path: null, defaults: { pledge: false, active: false, exec: false } },
   { key: "tab_parking", label: "Parking", group: "Parking", path: "/dashboard/parking", defaults: { pledge: true, active: true, exec: true } },
   { key: "manage_any_parking", label: "Edit anyone's parking info", group: "Parking", path: null, defaults: { pledge: false, active: false, exec: false } },
+  { key: "tab_guest_lists", label: "Party guest lists", group: "Guest Lists", path: "/dashboard/guest-lists", defaults: { pledge: false, active: true, exec: true } },
+  { key: "check_in_guests", label: "Check guests in at the door", group: "Guest Lists", path: null, defaults: { pledge: false, active: false, exec: true } },
+  { key: "manage_guest_lists", label: "Edit any guest list, including after it closes", group: "Guest Lists", path: null, defaults: { pledge: false, active: false, exec: true } },
   { key: "view_pledge_grades", label: "See pledges' grades", group: "Grades", path: null, defaults: { pledge: false, active: false, exec: false } },
 ];
 

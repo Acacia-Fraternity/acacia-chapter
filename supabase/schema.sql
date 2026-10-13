@@ -2011,6 +2011,236 @@ revoke execute on function note_tracker_ping(uuid, double precision, text) from 
 grant execute on function note_tracker_ping(uuid, double precision, text) to service_role;
 
 -- ============================================================
+-- Party guest lists. Every brother adds guests to a party's list until it
+-- closes (default: Wednesday 11:59 PM before the party, chapter time; an
+-- exec can override per party), then exec refine it and whoever works the
+-- door checks people in. Pledges never see any of it: select is gated by
+-- the tab_guest_lists permission (pledge = false), not just hidden in the UI.
+-- No insert/update/delete policies — writes go through the functions below,
+-- which enforce the close time and who may touch which row.
+-- ============================================================
+alter table events add column if not exists guest_list_closes_at timestamptz;
+
+create table if not exists party_guests (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references events (id) on delete cascade,
+  first_name text not null,
+  last_name text not null,
+  gender text not null check (gender in ('female', 'male', 'other')),
+  relationship text not null default '',
+  house text not null default '',
+  referral_id uuid references profiles (id) on delete set null,
+  added_by uuid references profiles (id) on delete set null,
+  checked_in_at timestamptz,
+  checked_in_by uuid references profiles (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create unique index if not exists party_guests_unique_name
+  on party_guests (event_id, lower(first_name), lower(last_name));
+create index if not exists party_guests_event on party_guests (event_id);
+
+alter table party_guests enable row level security;
+
+drop policy if exists "guest lists visible to permitted members" on party_guests;
+create policy "guest lists visible to permitted members"
+  on party_guests for select to authenticated
+  using (has_permission('tab_guest_lists'));
+
+insert into role_permissions (role, permission, allowed) values
+  ('pledge', 'tab_guest_lists', false),
+  ('active', 'tab_guest_lists', true),
+  ('exec', 'tab_guest_lists', true),
+  ('pledge', 'check_in_guests', false),
+  ('active', 'check_in_guests', false),
+  ('exec', 'check_in_guests', true),
+  ('pledge', 'manage_guest_lists', false),
+  ('active', 'manage_guest_lists', false),
+  ('exec', 'manage_guest_lists', true)
+on conflict (role, permission) do nothing;
+
+-- When the list closes: the explicit value, else the Wednesday 11:59 PM
+-- (Bloomington time) on or before the day of the party — a Wednesday party
+-- falls back to the Wednesday a week earlier so it never closes after it starts.
+create or replace function guest_list_close_at(p_event_id uuid)
+returns timestamptz
+language sql
+security definer set search_path = public
+stable
+as $$
+  select coalesce(
+    e.guest_list_closes_at,
+    (
+      ((e.starts_at at time zone 'America/Indiana/Indianapolis')::date
+        - case when ((extract(dow from (e.starts_at at time zone 'America/Indiana/Indianapolis'))::int + 4) % 7) = 0
+               then 7
+               else ((extract(dow from (e.starts_at at time zone 'America/Indiana/Indianapolis'))::int + 4) % 7)
+          end)
+      + time '23:59'
+    ) at time zone 'America/Indiana/Indianapolis'
+  )
+  from events e where e.id = p_event_id;
+$$;
+
+-- Assigned to the event (event_assignments) or granted check_in_guests.
+create or replace function can_work_guest_door(p_event_id uuid)
+returns boolean
+language sql
+security definer set search_path = public
+stable
+as $$
+  select has_permission('check_in_guests')
+    or has_permission('manage_guest_lists')
+    or exists (
+      select 1 from event_assignments a
+      where a.event_id = p_event_id and a.user_id = auth.uid()
+    );
+$$;
+
+create or replace function add_party_guest(
+  p_event_id uuid,
+  p_first text,
+  p_last text,
+  p_gender text,
+  p_relationship text,
+  p_house text,
+  p_referral uuid
+)
+returns uuid
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_event events%rowtype;
+  v_referral uuid := coalesce(p_referral, auth.uid());
+  v_id uuid;
+begin
+  if auth.uid() is null or not has_permission('tab_guest_lists') then
+    raise exception 'You can''t use guest lists';
+  end if;
+  select * into v_event from events where id = p_event_id;
+  if not found or v_event.category <> 'party' then
+    raise exception 'That event doesn''t have a guest list';
+  end if;
+  if now() > guest_list_close_at(p_event_id) and not has_permission('manage_guest_lists') then
+    raise exception 'This guest list has closed';
+  end if;
+  if length(trim(p_first)) = 0 or length(trim(p_last)) = 0 then
+    raise exception 'First and last name are required';
+  end if;
+  if not exists (select 1 from profiles where id = v_referral and not is_pledge) then
+    raise exception 'The referral has to be an active brother';
+  end if;
+  insert into party_guests (event_id, first_name, last_name, gender, relationship, house, referral_id, added_by)
+  values (p_event_id, trim(p_first), trim(p_last), p_gender, trim(p_relationship), trim(p_house), v_referral, auth.uid())
+  returning id into v_id;
+  return v_id;
+exception when unique_violation then
+  raise exception '% % is already on this list', trim(p_first), trim(p_last);
+end;
+$$;
+
+create or replace function update_party_guest(
+  p_guest_id uuid,
+  p_first text,
+  p_last text,
+  p_gender text,
+  p_relationship text,
+  p_house text,
+  p_referral uuid
+)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_guest party_guests%rowtype;
+begin
+  select * into v_guest from party_guests where id = p_guest_id;
+  if not found or not has_permission('tab_guest_lists') then
+    raise exception 'Guest not found';
+  end if;
+  if not has_permission('manage_guest_lists') then
+    if v_guest.added_by is distinct from auth.uid() then
+      raise exception 'You can only edit guests you added';
+    end if;
+    if now() > guest_list_close_at(v_guest.event_id) then
+      raise exception 'This guest list has closed';
+    end if;
+  end if;
+  if not exists (select 1 from profiles where id = coalesce(p_referral, v_guest.referral_id) and not is_pledge) then
+    raise exception 'The referral has to be an active brother';
+  end if;
+  update party_guests set
+    first_name = trim(p_first),
+    last_name = trim(p_last),
+    gender = p_gender,
+    relationship = trim(p_relationship),
+    house = trim(p_house),
+    referral_id = coalesce(p_referral, referral_id)
+  where id = p_guest_id;
+exception when unique_violation then
+  raise exception '% % is already on this list', trim(p_first), trim(p_last);
+end;
+$$;
+
+create or replace function remove_party_guest(p_guest_id uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_guest party_guests%rowtype;
+begin
+  select * into v_guest from party_guests where id = p_guest_id;
+  if not found or not has_permission('tab_guest_lists') then
+    raise exception 'Guest not found';
+  end if;
+  if not has_permission('manage_guest_lists') then
+    if v_guest.added_by is distinct from auth.uid() then
+      raise exception 'You can only remove guests you added';
+    end if;
+    if now() > guest_list_close_at(v_guest.event_id) then
+      raise exception 'This guest list has closed';
+    end if;
+  end if;
+  delete from party_guests where id = p_guest_id;
+end;
+$$;
+
+create or replace function check_in_party_guest(p_guest_id uuid, p_checked boolean)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_event_id uuid;
+begin
+  select event_id into v_event_id from party_guests where id = p_guest_id;
+  if v_event_id is null or not has_permission('tab_guest_lists') or not can_work_guest_door(v_event_id) then
+    raise exception 'You can''t check guests in for this party';
+  end if;
+  update party_guests set
+    checked_in_at = case when p_checked then now() else null end,
+    checked_in_by = case when p_checked then auth.uid() else null end
+  where id = p_guest_id;
+end;
+$$;
+
+create or replace function set_guest_list_close(p_event_id uuid, p_closes_at timestamptz)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if not (can_edit_calendar() or has_permission('manage_guest_lists')) then
+    raise exception 'Only exec can change when the list closes';
+  end if;
+  update events set guest_list_closes_at = p_closes_at where id = p_event_id and category = 'party';
+end;
+$$;
+
+-- ============================================================
 -- Bootstrap the first admin. Run this SEPARATELY, once, after you've
 -- signed up in the app yourself — replace the email below with yours.
 -- Every future admin promotion after this one can be done the same

@@ -558,3 +558,17 @@ their own admin-readable tables on purpose: `location_tokens` holds the bearer
 secret and must never get an admin read policy. "Down" in the UI is the same
 20 min (`src/lib/tracker-health.ts` must match the SQL). Phones that are off or
 out of signal also show as down; it can't tell those from a misconfigured app.
+
+## Party guest lists (party_guests)
+
+`/dashboard/guest-lists`, one list per `category = 'party'` event. Brothers add
+guests until the list closes (`guest_list_close_at()`: explicit
+`events.guest_list_closes_at`, else Wednesday 11:59 PM chapter time on/before
+the party); after that only `manage_guest_lists` (exec) can add/edit/remove.
+Door check-in is `check_in_party_guest()`, allowed for `check_in_guests`,
+`manage_guest_lists`, or anyone in `event_assignments` for that event.
+Pledges are blocked at the data layer: `party_guests` select requires
+`tab_guest_lists` (pledge = false), and every RPC re-checks it. Writes go only
+through the RPCs. Autofill = distinct past guests from this same table.
+House dropdown comes from `src/lib/greek-houses.ts` (Greekrank's IU
+Bloomington lists; IU has no machine-readable roster) — add missing chapters there.

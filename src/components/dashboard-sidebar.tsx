@@ -17,6 +17,7 @@ import {
   GraduationCap,
   Palette,
   ShieldCheck,
+  ListChecks,
   Pin,
   PinOff,
 } from "lucide-react";
@@ -29,6 +30,7 @@ const NAV_LINKS = [
   { href: "/dashboard/events", label: "Events", icon: CalendarCheck },
   { href: "/dashboard/calendar", label: "Calendar", icon: Calendar },
   { href: "/dashboard/chat", label: "Chat", icon: MessageSquare },
+  { href: "/dashboard/guest-lists", label: "Guest Lists", icon: ListChecks },
   { href: "/dashboard/gallery", label: "Gallery", icon: Images },
   { href: "/dashboard/dues", label: "Dues", icon: Wallet },
   { href: "/dashboard/polls", label: "Polls", icon: BarChart3 },
