@@ -195,7 +195,7 @@ insert into role_permissions (role, permission, allowed) values
   ('pledge', 'tab_pledgeship', true),
   ('active', 'tab_pledgeship', true),
   ('exec', 'tab_pledgeship', true),
-  ('pledge', 'pledgeship_schedule', true),
+  ('pledge', 'pledgeship_schedule', false),
   ('active', 'pledgeship_schedule', true),
   ('exec', 'pledgeship_schedule', true),
   ('pledge', 'pledgeship_quizzes', true),

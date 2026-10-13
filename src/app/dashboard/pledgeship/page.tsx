@@ -21,15 +21,15 @@ const newSeed = () => Math.random().toString(36).slice(2);
 
 type PledgeTab = "schedule" | "quizzes" | "hometowns";
 
-function Tabs({ tab }: { tab: PledgeTab }) {
+function Tabs({ tab, canSchedule }: { tab: PledgeTab; canSchedule: boolean }) {
+  const tabs: [PledgeTab, string][] = [
+    ...(canSchedule ? ([["schedule", "Schedule"]] as [PledgeTab, string][]) : []),
+    ["quizzes", "Quizzes"],
+    ["hometowns", "Hometowns"],
+  ];
   return (
     <div className="flex gap-2">
-      {(
-        [
-          ["schedule", "Schedule"],
-          ["quizzes", "Quizzes"],
-        ] as const
-      ).map(([value, label]) => (
+      {tabs.map(([value, label]) => (
         <Link
           key={value}
           href={`/dashboard/pledgeship?tab=${value}`}
@@ -233,7 +233,7 @@ export default async function PledgeshipPage({
           </span>
         )}
       </div>
-      {canSchedule && canQuizzes && <Tabs tab={tab} />}
+      {canQuizzes && <Tabs tab={tab} canSchedule={canSchedule} />}
 
       {tab === "schedule" ? <Schedule /> : tab === "hometowns" ? <HometownTab /> : <QuizTab />}
     </div>

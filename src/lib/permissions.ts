@@ -50,7 +50,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { key: "view_exec_chapter", label: "See the Exec tab in Chapter", group: "Chapter", path: null, defaults: { pledge: false, active: false, exec: true } },
   { key: "post_chapter_records", label: "Post chapter records (notes + files)", group: "Chapter", path: null, defaults: { pledge: false, active: false, exec: true } },
   { key: "tab_pledgeship", label: "Pledgeship", group: "Pledgeship", path: "/dashboard/pledgeship", defaults: { pledge: true, active: true, exec: true } },
-  { key: "pledgeship_schedule", label: "See the pledge schedule", group: "Pledgeship", path: null, defaults: { pledge: true, active: true, exec: true } },
+  { key: "pledgeship_schedule", label: "See the pledge schedule", group: "Pledgeship", path: null, defaults: { pledge: false, active: true, exec: true } },
   { key: "pledgeship_quizzes", label: "Use the pledge quizzes", group: "Pledgeship", path: null, defaults: { pledge: true, active: true, exec: true } },
   { key: "tab_house_points", label: "House Points", group: "House Points", path: "/dashboard/house-points", defaults: { pledge: true, active: true, exec: true } },
   { key: "tab_house_presence", label: "House Presence", group: "House Presence", path: "/dashboard/house-presence", defaults: { pledge: true, active: true, exec: true } },
