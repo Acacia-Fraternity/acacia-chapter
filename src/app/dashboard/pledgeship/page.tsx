@@ -4,6 +4,7 @@ import { allowedKeys } from "@/lib/permissions";
 import { CurriculumQuiz } from "@/components/curriculum-quiz";
 import { drawQuiz, questionBank } from "@/lib/curriculum/generator";
 import { chapterToday } from "@/lib/dues";
+import { hometownQuestions } from "@/lib/hometown-quiz";
 import {
   COMPRESSION_NOTE,
   INITIATION_CHECKLIST,
@@ -18,7 +19,9 @@ import {
 // A fresh seed per page load means every visit gets a different random order.
 const newSeed = () => Math.random().toString(36).slice(2);
 
-function Tabs({ tab }: { tab: "schedule" | "quizzes" }) {
+type PledgeTab = "schedule" | "quizzes" | "hometowns";
+
+function Tabs({ tab }: { tab: PledgeTab }) {
   return (
     <div className="flex gap-2">
       {(
@@ -187,6 +190,12 @@ function Schedule() {
   );
 }
 
+function pickTab(param: string | undefined, canSchedule: boolean, canQuizzes: boolean): PledgeTab {
+  if (param === "hometowns" && canQuizzes) return "hometowns";
+  if ((param === "quizzes" && canQuizzes) || !canSchedule) return "quizzes";
+  return "schedule";
+}
+
 export default async function PledgeshipPage({
   searchParams,
 }: {
@@ -212,8 +221,7 @@ export default async function PledgeshipPage({
   if (!canSchedule && !canQuizzes) {
     return <p className="text-sm text-muted">Your role doesn&apos;t have access to Pledgeship content.</p>;
   }
-  const tab: "schedule" | "quizzes" =
-    (tabParam === "quizzes" && canQuizzes) || !canSchedule ? "quizzes" : "schedule";
+  const tab = pickTab(tabParam, canSchedule, canQuizzes);
 
   return (
     <div className="space-y-4">
@@ -227,7 +235,7 @@ export default async function PledgeshipPage({
       </div>
       {canSchedule && canQuizzes && <Tabs tab={tab} />}
 
-      {tab === "schedule" ? <Schedule /> : <QuizTab />}
+      {tab === "schedule" ? <Schedule /> : tab === "hometowns" ? <HometownTab /> : <QuizTab />}
     </div>
   );
 }
@@ -236,5 +244,23 @@ function QuizTab() {
   const seed = newSeed();
   // The browser only ever gets one batch; the quiz reloads for another when it runs out.
   const questions = drawQuiz({ count: 200, seed });
+  return <CurriculumQuiz key={seed} questions={questions} />;
+}
+
+async function HometownTab() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("full_name, hometown")
+    .neq("hometown", "")
+    .returns<{ full_name: string; hometown: string }[]>();
+  const seed = newSeed();
+  const questions = hometownQuestions(
+    (data ?? []).map((m) => ({ name: m.full_name, hometown: m.hometown })),
+    seed,
+  );
+  if (questions.length === 0) {
+    return <p className="text-sm text-muted">No hometowns have been added yet.</p>;
+  }
   return <CurriculumQuiz key={seed} questions={questions} />;
 }

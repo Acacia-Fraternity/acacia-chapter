@@ -39,6 +39,9 @@ alter table profiles add column if not exists is_exec boolean not null default f
 -- Runs the pledge program: reads the pledge chat and sees pledge course
 -- grades. Admin-controlled.
 alter table profiles add column if not exists on_pledge_committee boolean not null default false;
+-- City and state only ("Bloomington, IN"); every profile column is readable by
+-- every member, so never put a street address here. Powers the Hometowns quiz.
+alter table profiles add column if not exists hometown text not null default '';
 
 alter table profiles enable row level security;
 
