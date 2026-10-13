@@ -122,7 +122,7 @@ insert into role_permissions (role, permission, allowed) values
   ('exec', 'tab_calendar', true),
   ('pledge', 'edit_calendar', false),
   ('active', 'edit_calendar', false),
-  ('exec', 'edit_calendar', false),
+  ('exec', 'edit_calendar', true),
   ('pledge', 'calendar_view_day', true),
   ('active', 'calendar_view_day', true),
   ('exec', 'calendar_view_day', true),

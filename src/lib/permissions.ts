@@ -25,7 +25,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { key: "review_excuses", label: "Review and decide event excuses", group: "Events", path: null, defaults: { pledge: false, active: false, exec: false } },
   { key: "view_event_feedback", label: "See event feedback and ratings", group: "Events", path: null, defaults: { pledge: false, active: false, exec: false } },
   { key: "tab_calendar", label: "Calendar", group: "Calendar", path: "/dashboard/calendar", defaults: { pledge: true, active: true, exec: true } },
-  { key: "edit_calendar", label: "Add, edit and delete calendar events", group: "Calendar", path: null, defaults: { pledge: false, active: false, exec: false } },
+  { key: "edit_calendar", label: "Add, edit and delete calendar events", group: "Calendar", path: null, defaults: { pledge: false, active: false, exec: true } },
   { key: "calendar_view_day", label: "Calendar: Day view", group: "Calendar", path: null, defaults: { pledge: true, active: true, exec: true } },
   { key: "calendar_view_week", label: "Calendar: Week view", group: "Calendar", path: null, defaults: { pledge: true, active: true, exec: true } },
   { key: "calendar_view_month", label: "Calendar: Month view", group: "Calendar", path: null, defaults: { pledge: true, active: true, exec: true } },
