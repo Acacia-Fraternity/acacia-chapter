@@ -6,6 +6,7 @@ import {
   FRATERNITIES,
   SORORITY_HOUSES,
   NO_HOUSE,
+  houseOptionLabel,
   OTHER_HOUSE,
   GUEST_GENDERS,
   GUEST_RELATIONSHIPS,
@@ -234,14 +235,14 @@ export function GuestForm({
             <optgroup label="Fraternities">
               {FRATERNITIES.map((h) => (
                 <option key={h} value={h}>
-                  {h}
+                  {houseOptionLabel(h)}
                 </option>
               ))}
             </optgroup>
             <optgroup label="Sororities">
               {SORORITY_HOUSES.map((h) => (
                 <option key={h} value={h}>
-                  {h}
+                  {houseOptionLabel(h)}
                 </option>
               ))}
             </optgroup>

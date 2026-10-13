@@ -98,3 +98,25 @@ export const GUEST_RELATIONSHIPS = [
   "Sorority sister",
   "Other",
 ] as const;
+
+const LETTERS: Record<string, string> = {
+  Alpha: "Α", Beta: "Β", Gamma: "Γ", Delta: "Δ", Epsilon: "Ε", Zeta: "Ζ",
+  Eta: "Η", Theta: "Θ", Iota: "Ι", Kappa: "Κ", Lambda: "Λ", Mu: "Μ",
+  Nu: "Ν", Xi: "Ξ", Omicron: "Ο", Pi: "Π", Rho: "Ρ", Sigma: "Σ",
+  Tau: "Τ", Upsilon: "Υ", Phi: "Φ", Chi: "Χ", Psi: "Ψ", Omega: "Ω",
+};
+
+/**
+ * Dropdown label: the Greek letters, then the full name in parentheses
+ * ("Alpha Epsilon Pi" -> "ΑΕΠ (Alpha Epsilon Pi)"). The stored value stays the
+ * plain name so analytics and past guests keep matching. Names that aren't
+ * Greek letters (Acacia, the catch-all options) are shown as they are.
+ */
+export function houseOptionLabel(name: string): string {
+  const m = name.match(/^(.*?) \((.+)\)$/);
+  const base = m ? m[1] : name;
+  const words = base.split(" ");
+  if (!words.every((w) => LETTERS[w])) return name;
+  const letters = words.map((w) => LETTERS[w]).join("");
+  return `${letters} (${m ? `${base}, ${m[2]}` : base})`;
+}
