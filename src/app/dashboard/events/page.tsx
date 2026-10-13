@@ -97,14 +97,21 @@ export default async function EventsPage() {
     supabase.from("event_assignments").select("*").returns<EventAssignment[]>(),
   ]);
 
-  // Soonest first: running/upcoming events in chronological order, then past
-  // ones (most recent first) so they don't bury what's coming up.
+  // What's coming up first (chronological), then past events, most recent
+  // first. A long-running span that already started (Pledge Duration is
+  // seven weeks) isn't "coming up", so it goes after the real upcoming
+  // events instead of pinning itself to the top for its whole run.
   const now = new Date().getTime();
+  const DAY = 24 * 60 * 60 * 1000;
+  const all = events ?? [];
+  const notOver = all.filter((e) => new Date(e.ends_at).getTime() >= now);
+  const isOngoingSpan = (e: Event) =>
+    new Date(e.starts_at).getTime() < now &&
+    new Date(e.ends_at).getTime() - new Date(e.starts_at).getTime() > 2 * DAY;
   const sortedEvents = [
-    ...(events ?? []).filter((e) => new Date(e.ends_at).getTime() >= now),
-    ...(events ?? [])
-      .filter((e) => new Date(e.ends_at).getTime() < now)
-      .reverse(),
+    ...notOver.filter((e) => !isOngoingSpan(e)),
+    ...notOver.filter(isOngoingSpan),
+    ...all.filter((e) => new Date(e.ends_at).getTime() < now).reverse(),
   ];
 
   const isAdmin = profile?.role === "admin";
