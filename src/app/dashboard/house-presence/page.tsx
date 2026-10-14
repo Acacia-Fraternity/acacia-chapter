@@ -173,6 +173,18 @@ export default async function HousePresencePage({
     else placeByUserId.delete(r.user_id);
   }
 
+  // Newest sign of life per member from either source. Trackers ping every
+  // ~3 min and a breadcrumb is written at least every 5, so 10 min of silence
+  // means the feed isn't updating live.
+  const lastUpdateByUserId = new Map<string, number>();
+  const noteUpdate = (userId: string, iso: string) => {
+    const t = new Date(iso).getTime();
+    if (t > (lastUpdateByUserId.get(userId) ?? 0)) lastUpdateByUserId.set(userId, t);
+  };
+  for (const r of trailRows) noteUpdate(r.user_id, r.recorded_at);
+  for (const s of lastSessions ?? []) noteUpdate(s.user_id, s.last_ping_at);
+  const LIVE_WINDOW_MS = 10 * 60_000;
+
   const visibleMembers = (members ?? []).filter((m) => {
     if (filter === "away") return !currentlyHomeSet.has(m.id);
     if (filter === "pledges") return m.is_pledge;
@@ -294,6 +306,23 @@ export default async function HousePresencePage({
                   {member.full_name || "(no name set)"}
                   {isSelf && <span className="text-muted-foreground"> (you)</span>}
                 </span>
+                {(() => {
+                  const updated = lastUpdateByUserId.get(member.id);
+                  if (updated !== undefined && now - updated <= LIVE_WINDOW_MS) {
+                    return (
+                      <span className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
+                        Live
+                      </span>
+                    );
+                  }
+                  return (
+                    <span className="rounded-full border border-surface-border px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                      {updated === undefined
+                        ? "Last updated: never"
+                        : `Last updated ${timeAgo(new Date(updated).toISOString(), now)}`}
+                    </span>
+                  );
+                })()}
                 {member.is_pledge && (
                   <span className="rounded-full bg-acacia-gold/25 px-2 py-0.5 text-xs font-medium">
                     Pledge
