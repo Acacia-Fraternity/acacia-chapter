@@ -2266,12 +2266,76 @@ begin
       order by id desc limit 1;
     if v_last is not null then
       delete from party_door_taps where id = v_last;
+      insert into party_door_log (event_id, action, created_by)
+      values (p_event_id, 'undo_' || p_direction, auth.uid());
     end if;
   else
     insert into party_door_taps (event_id, direction, created_by)
     values (p_event_id, p_direction, auth.uid());
+    insert into party_door_log (event_id, action, created_by)
+    values (p_event_id, p_direction, auth.uid());
   end if;
 end;
+$$;
+
+-- Every button press at the door, kept even after undo/reset (taps are the
+-- live count and get deleted; this is the audit trail). No policies: only
+-- the functions here touch it.
+create table if not exists party_door_log (
+  id bigint generated always as identity primary key,
+  event_id uuid not null references events (id) on delete cascade,
+  action text not null check (action in ('in', 'out', 'undo_in', 'undo_out', 'reset')),
+  created_by uuid references profiles (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists party_door_log_event on party_door_log (event_id, created_at);
+alter table party_door_log enable row level security;
+
+create or replace function door_reset(p_event_id uuid)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if auth.uid() is null or not has_permission('tab_guest_lists') or not can_work_guest_door(p_event_id) then
+    raise exception 'You can''t work the door for this party';
+  end if;
+  delete from party_door_taps where event_id = p_event_id;
+  insert into party_door_log (event_id, action, created_by)
+  values (p_event_id, 'reset', auth.uid());
+end;
+$$;
+
+-- Live taps with timestamps, for the occupancy graph. Anonymous: no user.
+create or replace function door_timeline(p_event_id uuid)
+returns table (direction text, created_at timestamptz)
+language sql
+security definer set search_path = public
+stable
+as $$
+  select t.direction, t.created_at
+  from party_door_taps t
+  where t.event_id = p_event_id
+    and auth.uid() is not null
+    and has_permission('tab_guest_lists')
+  order by t.created_at;
+$$;
+
+-- Full button log with who pressed, door crew only.
+create or replace function door_records(p_event_id uuid)
+returns table (action text, who text, created_at timestamptz)
+language sql
+security definer set search_path = public
+stable
+as $$
+  select l.action, coalesce(p.full_name, 'Unknown'), l.created_at
+  from party_door_log l
+  left join profiles p on p.id = l.created_by
+  where l.event_id = p_event_id
+    and auth.uid() is not null
+    and has_permission('tab_guest_lists')
+    and can_work_guest_door(p_event_id)
+  order by l.created_at desc, l.id desc;
 $$;
 
 create or replace function door_counts(p_event_id uuid)

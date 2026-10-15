@@ -42,6 +42,17 @@ export function DoorCounter({
     setBusy(false);
   }
 
+  async function resetAll() {
+    if (busy) return;
+    if (!window.confirm("Reset the check-in and check-out counts to zero for this party?")) return;
+    setBusy(true);
+    setError(null);
+    const { error: err } = await createClient().rpc("door_reset", { p_event_id: eventId });
+    if (err) setError(err.message);
+    await load();
+    setBusy(false);
+  }
+
   const inside = counts ? counts.entered - counts.left : 0;
   const stat = "rounded-lg border border-surface-border bg-surface p-4 text-center";
   const big = "min-h-24 rounded-xl text-xl font-bold disabled:opacity-50 active:scale-[0.98]";
@@ -95,6 +106,15 @@ export function DoorCounter({
               className="text-muted-foreground underline disabled:opacity-50"
             >
               Undo last check-out
+            </button>
+          </div>
+          <div className="flex justify-center">
+            <button
+              disabled={busy}
+              onClick={resetAll}
+              className="rounded-md border border-red-600 px-3 py-1.5 text-xs font-semibold text-red-600 disabled:opacity-50"
+            >
+              Reset all
             </button>
           </div>
         </>

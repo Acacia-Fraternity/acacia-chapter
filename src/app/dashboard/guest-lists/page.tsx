@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { allowedKeys } from "@/lib/permissions";
-import { CHAPTER_TZ, formatChapterTime } from "@/lib/chapter-time";
+import { CHAPTER_TZ, chapterWallTimeToIso, formatChapterTime } from "@/lib/chapter-time";
+import { DoorOccupancyChart } from "@/components/door-occupancy-chart";
 import { GuestForm, type PreviousGuest } from "@/components/guest-form";
 import { GuestRow, type GuestRowData } from "@/components/guest-row";
 import { GuestDoorList } from "@/components/guest-door-list";
@@ -10,7 +11,15 @@ import { DoorCounter } from "@/components/door-counter";
 import { NO_HOUSE } from "@/lib/greek-houses";
 import type { Event, PartyGuest, Profile } from "@/lib/types";
 
-type View = "list" | "door" | "checkout" | "analytics";
+type View = "list" | "door" | "checkout" | "analytics" | "records";
+
+const ACTION_LABEL: Record<string, string> = {
+  in: "Check in (+1)",
+  out: "Check out (−1)",
+  undo_in: "Undo last check-in",
+  undo_out: "Undo last check-out",
+  reset: "Reset all",
+};
 
 const card = "rounded-lg border border-surface-border bg-surface p-4";
 
@@ -133,11 +142,38 @@ export default async function GuestListsPage({
   }
 
   const requested: View =
-    viewParam === "door" || viewParam === "checkout" || viewParam === "analytics"
+    viewParam === "door" ||
+    viewParam === "checkout" ||
+    viewParam === "analytics" ||
+    viewParam === "records"
       ? viewParam
       : "list";
   const view: View =
-    (requested === "door" || requested === "checkout") && !canWorkDoor ? "list" : requested;
+    (requested === "door" || requested === "checkout" || requested === "records") && !canWorkDoor
+      ? "list"
+      : requested;
+
+  // Occupancy graph window: 8:30 PM to 1:30 AM chapter time. A party that
+  // starts before noon belongs to the previous evening's window.
+  const localStart = toLocalInput(event.starts_at);
+  const dayMs = Date.parse(`${localStart.slice(0, 10)}T00:00:00Z`);
+  const evening = new Date(dayMs + (Number(localStart.slice(11, 13)) < 12 ? -86400000 : 0));
+  const next = new Date(evening.getTime() + 86400000);
+  const windowStartMs = Date.parse(
+    chapterWallTimeToIso(`${evening.toISOString().slice(0, 10)}T20:30`),
+  );
+  const windowEndMs = Date.parse(chapterWallTimeToIso(`${next.toISOString().slice(0, 10)}T01:30`));
+
+  let timeline: { direction: string; created_at: string }[] = [];
+  let records: { action: string; who: string; created_at: string }[] = [];
+  if (view === "analytics") {
+    const { data } = await supabase.rpc("door_timeline", { p_event_id: event.id });
+    timeline = (data as typeof timeline | null) ?? [];
+  }
+  if (view === "records") {
+    const { data } = await supabase.rpc("door_records", { p_event_id: event.id });
+    records = (data as typeof records | null) ?? [];
+  }
 
   const rows: GuestRowData[] = guests.map((g) => ({
     id: g.id,
@@ -186,6 +222,7 @@ export default async function GuestListsPage({
       ? [
           { id: "door" as View, label: "Door check-in" },
           { id: "checkout" as View, label: "Door checkout" },
+          { id: "records" as View, label: "Records" },
         ]
       : []),
     { id: "analytics", label: "Analytics" },
@@ -289,6 +326,14 @@ export default async function GuestListsPage({
           </div>
 
           <div className={card}>
+            <p className="mb-1 text-sm font-semibold">People at the party</p>
+            <p className="mb-3 text-xs text-muted-foreground">
+              From the door check-in / check-out buttons, 8:30 PM to 1:30 AM.
+            </p>
+            <DoorOccupancyChart taps={timeline} startMs={windowStartMs} endMs={windowEndMs} nowMs={nowMs} />
+          </div>
+
+          <div className={card}>
             <p className="mb-3 text-sm font-semibold">Guests by house</p>
             {houseCounts.length === 0 ? (
               <p className="text-sm text-muted-foreground">No guests yet.</p>
@@ -365,6 +410,35 @@ export default async function GuestListsPage({
             leaves.
           </p>
           <DoorCounter eventId={event.id} canWork={canWorkDoor} />
+        </div>
+      )}
+
+      {view === "records" && (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Every door button press for this party, newest first.
+          </p>
+          {records.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nothing pressed yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {records.map((r, i) => (
+                <li key={i} className={`${card} flex items-center justify-between gap-3 text-sm`}>
+                  <span className="font-medium">{ACTION_LABEL[r.action] ?? r.action}</span>
+                  <span className="text-right text-xs text-muted-foreground">
+                    {r.who} ·{" "}
+                    {formatChapterTime(r.created_at, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
