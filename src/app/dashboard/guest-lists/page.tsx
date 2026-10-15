@@ -4,7 +4,8 @@ import { allowedKeys } from "@/lib/permissions";
 import { CHAPTER_TZ, chapterWallTimeToIso, formatChapterTime } from "@/lib/chapter-time";
 import { DoorOccupancyChart } from "@/components/door-occupancy-chart";
 import { GuestForm, type PreviousGuest } from "@/components/guest-form";
-import { GuestRow, type GuestRowData } from "@/components/guest-row";
+import type { GuestRowData } from "@/components/guest-row";
+import { GuestListView } from "@/components/guest-list-view";
 import { GuestDoorList } from "@/components/guest-door-list";
 import { GuestCloseForm } from "@/components/guest-close-form";
 import { DoorCounter } from "@/components/door-counter";
@@ -382,23 +383,12 @@ export default async function GuestListsPage({
             <p className="mb-2 text-sm font-semibold">
               On the list ({total})
             </p>
-            {rows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nobody yet.</p>
-            ) : (
-              <ul className="space-y-2">
-                {rows.map((g) => (
-                  <GuestRow
-                    key={g.id}
-                    guest={g}
-                    eventId={event.id}
-                    door={false}
-                    canCheckIn={false}
-                    previous={previous}
-                    existing={existing}
-                  />
-                ))}
-              </ul>
-            )}
+            <GuestListView
+              rows={rows}
+              eventId={event.id}
+              previous={previous}
+              existing={existing}
+            />
           </div>
         </div>
       )}
