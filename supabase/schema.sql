@@ -2230,6 +2230,65 @@ begin
 end;
 $$;
 
+-- Anonymous headcount clicker for the door (OSFL wants in/out totals, not
+-- who). A log of +1 clicks rather than one mutable counter so two doormen
+-- tapping at once never lose an update and a mistaken tap is just a
+-- compensating row. No policies: only the functions below touch it.
+create table if not exists party_door_taps (
+  id bigint generated always as identity primary key,
+  event_id uuid not null references events (id) on delete cascade,
+  direction text not null check (direction in ('in', 'out')),
+  created_by uuid references profiles (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists party_door_taps_event on party_door_taps (event_id);
+alter table party_door_taps enable row level security;
+
+-- p_delta 1 = one more person through the door, -1 = undo that tap.
+-- Same for 'out'. Undo removes the caller's most recent tap in that direction.
+create or replace function door_tap(p_event_id uuid, p_direction text, p_undo boolean default false)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_last bigint;
+begin
+  if p_direction not in ('in', 'out') then
+    raise exception 'Bad direction';
+  end if;
+  if auth.uid() is null or not has_permission('tab_guest_lists') or not can_work_guest_door(p_event_id) then
+    raise exception 'You can''t work the door for this party';
+  end if;
+  if p_undo then
+    select id into v_last from party_door_taps
+      where event_id = p_event_id and direction = p_direction
+      order by id desc limit 1;
+    if v_last is not null then
+      delete from party_door_taps where id = v_last;
+    end if;
+  else
+    insert into party_door_taps (event_id, direction, created_by)
+    values (p_event_id, p_direction, auth.uid());
+  end if;
+end;
+$$;
+
+create or replace function door_counts(p_event_id uuid)
+returns table (entered int, left_count int)
+language sql
+security definer set search_path = public
+stable
+as $$
+  select
+    count(*) filter (where direction = 'in')::int,
+    count(*) filter (where direction = 'out')::int
+  from party_door_taps
+  where event_id = p_event_id
+    and auth.uid() is not null
+    and has_permission('tab_guest_lists');
+$$;
+
 create or replace function set_guest_list_close(p_event_id uuid, p_closes_at timestamptz)
 returns void
 language plpgsql

@@ -6,10 +6,11 @@ import { GuestForm, type PreviousGuest } from "@/components/guest-form";
 import { GuestRow, type GuestRowData } from "@/components/guest-row";
 import { GuestDoorList } from "@/components/guest-door-list";
 import { GuestCloseForm } from "@/components/guest-close-form";
+import { DoorCounter } from "@/components/door-counter";
 import { NO_HOUSE } from "@/lib/greek-houses";
 import type { Event, PartyGuest, Profile } from "@/lib/types";
 
-type View = "list" | "door" | "analytics";
+type View = "list" | "door" | "checkout" | "analytics";
 
 const card = "rounded-lg border border-surface-border bg-surface p-4";
 
@@ -131,8 +132,12 @@ export default async function GuestListsPage({
     });
   }
 
-  const requested: View = viewParam === "door" || viewParam === "analytics" ? viewParam : "list";
-  const view: View = requested === "door" && !canWorkDoor ? "list" : requested;
+  const requested: View =
+    viewParam === "door" || viewParam === "checkout" || viewParam === "analytics"
+      ? viewParam
+      : "list";
+  const view: View =
+    (requested === "door" || requested === "checkout") && !canWorkDoor ? "list" : requested;
 
   const rows: GuestRowData[] = guests.map((g) => ({
     id: g.id,
@@ -177,7 +182,12 @@ export default async function GuestListsPage({
 
   const tabs: { id: View; label: string }[] = [
     { id: "list", label: "List" },
-    ...(canWorkDoor ? [{ id: "door" as View, label: "Door check-in" }] : []),
+    ...(canWorkDoor
+      ? [
+          { id: "door" as View, label: "Door check-in" },
+          { id: "checkout" as View, label: "Door checkout" },
+        ]
+      : []),
     { id: "analytics", label: "Analytics" },
   ];
 
@@ -345,6 +355,16 @@ export default async function GuestListsPage({
               </ul>
             )}
           </div>
+        </div>
+      )}
+
+      {view === "checkout" && (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Headcount only (not tied to any guest). Tap + when someone comes in, − when someone
+            leaves.
+          </p>
+          <DoorCounter eventId={event.id} canWork={canWorkDoor} />
         </div>
       )}
 
